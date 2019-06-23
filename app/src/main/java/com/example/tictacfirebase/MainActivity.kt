@@ -3,6 +3,7 @@ package com.example.tictacfirebase
 
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -14,7 +15,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import kotlinx.android.synthetic.main.activity_main.*
 
-class MainActivity : AppCompatActivity() {
+open class MainActivity : AppCompatActivity() {
 
     companion object {
         val TAG = "MainActivity"
@@ -41,8 +42,8 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    protected fun buClick(view: android.view.View) {
-        val buSelected = view as android.widget.Button
+    fun buClick(view: android.view.View) {
+        val buSelected = view as Button
         var cellID = 0
         when (buSelected.id) {
             com.example.tictacfirebase.R.id.bu1 -> cellID = 1
@@ -180,19 +181,19 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    protected fun buRequestEvent(view: android.view.View) {
+    fun buRequestEvent(view: View) {
         var userDemail = etEmail.text.toString()
 
-        myRef.child("users").child(SplitString(userDemail)).child("Request").push().setValue(myEmail)
+        myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
 
 
         PlayerOnline(SplitString(myEmail!!) + SplitString(userDemail)) // husseinjena
         PlayerSymbol = "X"
     }
 
-    protected fun buAcceptEvent(view: android.view.View) {
+    fun buAcceptEvent(view: View) {
         var userDemail = etEmail.text.toString()
-        myRef.child("users").child(SplitString(userDemail)).child("Request").push().setValue(myEmail)
+        myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
 
 
         PlayerOnline(SplitString(userDemail) + SplitString(myEmail!!)) //husseinjena
@@ -218,11 +219,14 @@ class MainActivity : AppCompatActivity() {
                             var value: String
                             for (key in td.keys) {
                                 value = td[key] as String
+                                Log.d(TAG, "PlayerValue: $value")
 
                                 if (value != myEmail) {
                                     ActivePlayer = if (PlayerSymbol === "X") 1 else 2
+                                    Log.d(TAG, "PlayerValue: $ActivePlayer")
                                 } else {
                                     ActivePlayer = if (PlayerSymbol === "X") 2 else 1
+                                    Log.d(TAG, "PlayerElseValue: $ActivePlayer")
                                 }
 
                                 AutoPlay(key.toInt())
@@ -247,7 +251,7 @@ class MainActivity : AppCompatActivity() {
 
     var number = 0
     fun IncommingCalls() {
-        myRef.child("users").child(SplitString(myEmail!!)).child("Request")
+        myRef.child("users").child(SplitString(myEmail!!)).child("request")
             .addValueEventListener(object : ValueEventListener {
 
                 override fun onDataChange(p0: DataSnapshot) {
@@ -268,7 +272,7 @@ class MainActivity : AppCompatActivity() {
 //                                notifyme.sendNotification("")
                                 number++
                                 Log.d(TAG, "IncommingmyEmail: $myEmail")
-                                myRef.child("users").child(SplitString(myEmail!!)).child("Request").setValue(true)
+                                myRef.child("users").child(SplitString(myEmail!!)).child("request").setValue(true)
 
                                 break
 
