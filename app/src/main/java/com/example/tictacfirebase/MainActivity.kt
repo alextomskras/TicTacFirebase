@@ -7,7 +7,6 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.tictacfirebase.service.Notifications
-
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -28,7 +27,7 @@ class MainActivity : AppCompatActivity() {
     var myEmail: String? = null
 
 
-lateinit var mFirebaseAnalytics:FirebaseAnalytics
+    lateinit var mFirebaseAnalytics: FirebaseAnalytics
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -243,6 +242,7 @@ lateinit var mFirebaseAnalytics:FirebaseAnalytics
 
             })
 
+
     }
 
     var number = 0
@@ -260,12 +260,15 @@ lateinit var mFirebaseAnalytics:FirebaseAnalytics
                             var value: String
                             for (key in td.keys) {
                                 value = td[key] as String
+                                Log.d(TAG, "Incomming: $value")
                                 etEmail.setText(value)
-
                                 val notifyme = Notifications()
+//                                val notifyme = MyFirebaseMessagingService()
                                 notifyme.Notify(applicationContext, value + " want to play tic tac toy", number)
+//                                notifyme.sendNotification("")
                                 number++
-                                myRef.child("Users").child(SplitString(myEmail!!)).child("Request").setValue(true)
+                                Log.d(TAG, "IncommingmyEmail: $myEmail")
+                                myRef.child("users").child(SplitString(myEmail!!)).child("Request").setValue(true)
 
                                 break
 
