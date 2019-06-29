@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools"
+              xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:tools="http://schemas.android.com/tools"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:background="@color/whitebackground"
@@ -19,8 +19,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:ems="10"
-                android:hint="Other player email"
-                android:inputType="textPersonName"/>
+                android:hint="@string/other_player_email"
+                android:inputType="textEmailAddress"/>
 
         <Button
                 android:id="@+id/burequest"
@@ -30,7 +30,7 @@
                 android:layout_weight="1"
                 android:background="@color/blue"
                 android:onClick="buRequestEvent"
-                android:text="Request"/>
+                android:text="@string/request"/>
 
         <Button
                 android:onClick="buAcceptEvent"
@@ -40,12 +40,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Accept"/>
+                android:text="@string/accept"/>
     </LinearLayout>
 
     <TableLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="431dp"
             android:background="@color/whitebackground"
             android:gravity="center">
 
@@ -139,4 +139,14 @@
                     android:onClick="buClick"/>
         </TableRow>
     </TableLayout>
+
+    <de.hdodenhof.circleimageview.CircleImageView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:id="@+id/image_View_user2"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_fire_emoji"
+            app:civ_border_width="2dp"
+            app:civ_border_overlay="true"
+            app:civ_border_color="#FF000000"/>
 </LinearLayout>

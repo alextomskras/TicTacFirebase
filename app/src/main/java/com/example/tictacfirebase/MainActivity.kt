@@ -7,13 +7,20 @@ import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.tictacfirebase.service.Notifications
+import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.iid.FirebaseInstanceId
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.RemoteMessage
+import com.squareup.picasso.Picasso
 import kotlinx.android.synthetic.main.activity_main.*
+import java.util.*
+
 
 open class MainActivity : AppCompatActivity() {
 
@@ -21,6 +28,8 @@ open class MainActivity : AppCompatActivity() {
         val TAG = "MainActivity"
     }
 
+    private val SENDER_ID = "793202519353"
+    private val random = Random()
     //database instance
     private var database = FirebaseDatabase.getInstance()
     private var myRef = database.reference
@@ -28,21 +37,38 @@ open class MainActivity : AppCompatActivity() {
     var myEmail: String? = null
 
 
+    lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        refreshTokens()
+//        var tokenID = MyFirebaseMessagingService()
+//        val newToken = tokenID.otherStyleGetToken().toString()
+//        Log.d(TAG, "getTokenID: $newToken")
+
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
-
+        val channelId = getString(R.string.default_notification_channel_id)
         var b: Bundle = intent.extras
         myEmail = b.getString("email")
         Log.d(TAG, "getExtraEmail: $myEmail")
+        supportActionBar?.title = "$channelId $myEmail"
         IncommingCalls()
     }
 
+    private fun refreshTokens(): String? {
+        val newToken = FirebaseInstanceId.getInstance().token
+        Log.d("newToken", (newToken))
+        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
+        return newToken
 
-    fun buClick(view: android.view.View) {
+//        if (newToken != null) {
+//            MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+//        }
+    }
+
+    fun buClick(view: View) {
         val buSelected = view as Button
         var cellID = 0
         when (buSelected.id) {
@@ -60,6 +86,7 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "ID:" + cellID, Toast.LENGTH_LONG).show()
 
         sessionID?.let { myRef.child("PlayerOnline").child(it).child(cellID.toString()).setValue(myEmail) }
+//        myRef.child("PlayerOnline").child(sessionID!!).child(cellID.toString()).setValue(myEmail)
     }
 
     var player1 = java.util.ArrayList<Int>()
@@ -161,19 +188,19 @@ open class MainActivity : AppCompatActivity() {
     fun AutoPlay(cellID: Int) {
 
 
-        var buSelect: Button?
-        when (cellID) {
-            1 -> buSelect = bu1
-            2 -> buSelect = bu2
-            3 -> buSelect = bu3
-            4 -> buSelect = bu4
-            5 -> buSelect = bu5
-            6 -> buSelect = bu6
-            7 -> buSelect = bu7
-            8 -> buSelect = bu8
-            9 -> buSelect = bu9
+        val buSelect: Button?
+        buSelect = when {
+            cellID == 1 -> bu1
+            cellID == 2 -> bu2
+            cellID == 3 -> bu3
+            cellID == 4 -> bu4
+            cellID == 5 -> bu5
+            cellID == 6 -> bu6
+            cellID == 7 -> bu7
+            cellID == 8 -> bu8
+            cellID == 9 -> bu9
             else -> {
-                buSelect = bu1
+                bu1
             }
         }
 
@@ -183,6 +210,10 @@ open class MainActivity : AppCompatActivity() {
 
     fun buRequestEvent(view: View) {
         var userDemail = etEmail.text.toString()
+        val pict =
+            "https://firebasestorage.googleapis.com/v0/b/tictacfirebase-749a6.appspot.com/o/images%2F1f9038c8-2987-41c1-96ee-c4f6f9a3fcf9?alt=media&token=d3fd790b-a27a-4f57-ace9-0311a7846c23"
+        Picasso.get().load(pict)
+            .into(image_View_user2)
 
         myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
 
@@ -201,6 +232,8 @@ open class MainActivity : AppCompatActivity() {
 
     }
 
+
+    //var cellID: String? =
     var sessionID: String? = null
     var PlayerSymbol: String? = null
     fun PlayerOnline(sessionID: String) {
@@ -212,21 +245,25 @@ open class MainActivity : AppCompatActivity() {
                     try {
                         player1.clear()
                         player2.clear()
-                        val td = p0.value as HashMap<String, Any>
-                        Log.d(TAG, "PlayerOnline: $td")
+//                        val list = ArrayList<String>(theHashMap.values())
+//                        val td = p0!!.value as String
+                        val td = (if (p0 != null) p0.value else null) as? HashMap<String, Any>
+//                        val td1 = p0!!.value as java.util.HashMap<String,Any>
+                        Log.d(TAG, "PlayerOn1: $td")
+//                        Log.d(TAG, "PlayerOn2: $td1")
                         if (td != null) {
 
-                            var value: String
+                            var value: String?
                             for (key in td.keys) {
                                 value = td[key] as String
-                                Log.d(TAG, "PlayerValue: $value")
+                                Log.d(TAG, "PlayerHash: $value")
 
                                 if (value != myEmail) {
                                     ActivePlayer = if (PlayerSymbol === "X") 1 else 2
-                                    Log.d(TAG, "PlayerValue: $ActivePlayer")
+                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
                                 } else {
                                     ActivePlayer = if (PlayerSymbol === "X") 2 else 1
-                                    Log.d(TAG, "PlayerElseValue: $ActivePlayer")
+                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
                                 }
 
                                 AutoPlay(key.toInt())
@@ -237,6 +274,8 @@ open class MainActivity : AppCompatActivity() {
                         }
 
                     } catch (ex: Exception) {
+                        println("Somthing wrongex" + ex)
+                        Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
                     }
                 }
 
@@ -249,6 +288,57 @@ open class MainActivity : AppCompatActivity() {
 
     }
 
+//    fun CheckButtonOnline(sessionID: String) {
+//        this.sessionID = sessionID
+//        myRef.child("PlayerOnline").child(sessionID).
+//            .addValueEventListener(object : ValueEventListener {
+//                override fun onDataChange(p0: DataSnapshot) {
+//                    try {
+//                        player1.clear()
+//                        player2.clear()
+////                        val list = ArrayList<String>(theHashMap.values())
+////                        val td = p0!!.value as String
+//                        val td = p0.value.toString()
+//                        val td1 = p0!!.value as HashMap<String,Int>
+//                        Log.d(TAG, "PlayerOn1: $td")
+//                        Log.d(TAG, "PlayerOn2: $td1")
+//                        if (td != null) {
+//                            myRef.child("PlayerOnline").child(sessionID).key
+//
+//                            var value: String?
+//                            for (key in td1.keys) {
+//                                value = td1[key].toString()
+//                                Log.d(TAG, "PlayerHash: $value")
+//
+//                                if (value != myEmail) {
+//                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
+//                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
+//                                } else {
+//                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
+//                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
+//                                }
+//
+//                                AutoPlay(key as Int)
+//
+//
+//                            }
+//
+//                        }
+//
+//                    } catch (ex: Exception) {
+//                        println("Somthing wrongex"+ex)
+//                    }
+//                }
+//
+//                override fun onCancelled(p0: DatabaseError) {
+//
+//                }
+//
+//            })
+//
+//
+//    }
+
     var number = 0
     fun IncommingCalls() {
         myRef.child("users").child(SplitString(myEmail!!)).child("request")
@@ -258,7 +348,8 @@ open class MainActivity : AppCompatActivity() {
 
 
                     try {
-                        val td = p0.value as HashMap<String, Any>
+                        val td: HashMap<String, Any>
+                        td = p0.value as HashMap<String, Any>
                         if (td != null) {
 
                             var value: String
@@ -266,10 +357,11 @@ open class MainActivity : AppCompatActivity() {
                                 value = td[key] as String
                                 Log.d(TAG, "Incomming: $value")
                                 etEmail.setText(value)
-                                val notifyme = Notifications()
+///                                val notifyme = Notifications()
 //                                val notifyme = MyFirebaseMessagingService()
-                                notifyme.Notify(applicationContext, value + " want to play tic tac toy", number)
-//                                notifyme.sendNotification("")
+///                                notifyme.Notify(applicationContext, value + " want to play tic tac toy", number)
+//                                notifyme.sendNotification(RemoteMessage())
+                                perfotmFCMSendMessages()
                                 number++
                                 Log.d(TAG, "IncommingmyEmail: $myEmail")
                                 myRef.child("users").child(SplitString(myEmail!!)).child("request").setValue(true)
@@ -281,6 +373,8 @@ open class MainActivity : AppCompatActivity() {
                         }
 
                     } catch (ex: Exception) {
+                        println("Somthing EXwr" + ex)
+                        Toast.makeText(applicationContext, " Somthing EXwr+$ex", Toast.LENGTH_LONG).show()
                     }
                 }
 
@@ -297,7 +391,34 @@ open class MainActivity : AppCompatActivity() {
         return split[0]
     }
 
+    fun perfotmFCMSendMessages() {
+        val fromId = FirebaseAuth.getInstance().uid
+//        val user = intent.getParcelableExtra<User>(NewMessageActivity.USER_KEY)
+        val user = myEmail
+        val toId = user
+//        btn_upmessage.setOnClickListener {
+        val fm = FirebaseMessaging.getInstance()
+//793202519353@gcm.googleapis.com
+        val message = RemoteMessage.Builder(SENDER_ID + "@fcm.googleapis.com")
 
+            .setMessageId(Integer.toString(random.nextInt(9999)))
+            .addData("TEST1-- $fromId", "TEST1--  $toId")
+//                    .addData(edt_key1.text.toString(), edt_value1.text.toString())
+//                    .addData(edt_key2.text.toString(), edt_value2.text.toString())
+            .build()
+        Log.e(TAG, "UpstreamData: " + message)
+
+        if (!message.data.isEmpty()) {
+            Log.e(TAG, "UpstreamData: " + message.data)
+        }
+
+        if (!message.messageId!!.isEmpty()) {
+            Log.e(TAG, "UpstreamMessageId: " + message.messageId)
+        }
+
+        fm.send(message)
+//        }
+    }
 
 
 }

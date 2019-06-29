@@ -5,7 +5,10 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.iid.FirebaseInstanceId
 import kotlinx.android.synthetic.main.activity_login.*
 
 class LoginActivity : AppCompatActivity() {
@@ -30,7 +33,18 @@ class LoginActivity : AppCompatActivity() {
 
     private fun performLogin() {
         val email = email_edittext_login.text.toString()
+        val stripEmail = SplitString(email)
         val password = password_edittext_login.text.toString()
+        val newTokens = refreshTokens().toString()
+
+        val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
+        ref.setValue(newTokens)
+            .addOnSuccessListener {
+                Log.d(TAG, "Finally we saved the user to Firebase Database")
+            }
+            .addOnFailureListener {
+                Log.d(TAG, "Failed to set value to database: ${it.message}")
+            }
 
         if (email.isEmpty() || password.isEmpty()) {
             Toast.makeText(this, "Please fill out email/pw.", Toast.LENGTH_SHORT).show()
@@ -55,6 +69,23 @@ class LoginActivity : AppCompatActivity() {
             .addOnFailureListener {
                 Toast.makeText(this, "Failed to log in: ${it.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    private fun refreshTokens(): String? {
+        val newToken = FirebaseInstanceId.getInstance().token
+        Log.d("newToken", (newToken))
+        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
+
+
+        if (newToken != null) {
+            MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+        }
+        return newToken
+    }
+
+    fun SplitString(str: String): String {
+        var split = str.split("@")
+        return split[0]
     }
 
 }
