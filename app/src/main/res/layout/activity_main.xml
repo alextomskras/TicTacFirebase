@@ -45,7 +45,7 @@
 
     <TableLayout
             android:layout_width="match_parent"
-            android:layout_height="431dp"
+            android:layout_height="363dp"
             android:background="@color/whitebackground"
             android:gravity="center">
 

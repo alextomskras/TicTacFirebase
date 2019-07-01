@@ -35,21 +35,22 @@ class LoginActivity : AppCompatActivity() {
         val email = email_edittext_login.text.toString()
         val stripEmail = SplitString(email)
         val password = password_edittext_login.text.toString()
-        val newTokens = refreshTokens().toString()
 
-        val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
-        ref.setValue(newTokens)
-            .addOnSuccessListener {
-                Log.d(TAG, "Finally we saved the user to Firebase Database")
-            }
-            .addOnFailureListener {
-                Log.d(TAG, "Failed to set value to database: ${it.message}")
-            }
+
+//        val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
+//        ref.setValue(newTokens)
+//            .addOnSuccessListener {
+//                Log.d(TAG, "Finally we saved the user to Firebase Database")
+//            }
+//            .addOnFailureListener {
+//                Log.d(TAG, "Failed to set value to database: ${it.message}")
+//            }
 
         if (email.isEmpty() || password.isEmpty()) {
             Toast.makeText(this, "Please fill out email/pw.", Toast.LENGTH_SHORT).show()
             return
         }
+        refreshTokens(stripEmail)
 
         FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
             .addOnCompleteListener {
@@ -71,7 +72,7 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    private fun refreshTokens(): String? {
+    private fun refreshTokens(stripEmail: String): String? {
         val newToken = FirebaseInstanceId.getInstance().token
         Log.d("newToken", (newToken))
         Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
@@ -79,6 +80,15 @@ class LoginActivity : AppCompatActivity() {
 
         if (newToken != null) {
             MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+            val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
+            ref.setValue(newToken)
+                .addOnSuccessListener {
+                    Log.d(TAG, "Finally we saved the Token to Firebase Database")
+                }
+                .addOnFailureListener {
+                    Log.d(TAG, "Failed to set value to database: ${it.message}")
+                }
+
         }
         return newToken
     }
