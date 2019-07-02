@@ -40,13 +40,20 @@ open class MainActivity : AppCompatActivity() {
 
     lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        //Hide img+player2name
+        player2_text_View!!.visibility = View.GONE
+        image_View_user2!!.visibility = View.GONE
+
         refreshTokens()
+
 //        var tokenID = MyFirebaseMessagingService()
 //        val newToken = tokenID.otherStyleGetToken().toString()
 //        Log.d(TAG, "getTokenID: $newToken")
+
 
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
@@ -220,7 +227,13 @@ open class MainActivity : AppCompatActivity() {
             Log.e(TAG, "PlayerPictIT:" + it)
             val pict1 = it
         }
-//        showProfileAndFriends(test3)
+        //unHide player2 icon
+        player2_text_View!!.visibility = View.VISIBLE
+        image_View_user2.visibility = View.VISIBLE
+        player2_text_View.text = "Player2-" + SplitString(userDemail)
+
+
+
         val pict1 = getImageProfile {
             Log.e(TAG, "PlayerPictIT1:" + it)
             val pict1 = it
