@@ -184,6 +184,22 @@ open class MainActivity : AppCompatActivity() {
             winer = 2
         }
 
+        // cros 1
+        if (player1.contains(1) && player1.contains(5) && player1.contains(9)) {
+            winer = 1
+        }
+        if (player2.contains(1) && player2.contains(5) && player2.contains(9)) {
+            winer = 2
+        }
+
+        // cros 2
+        if (player1.contains(3) && player1.contains(5) && player1.contains(7)) {
+            winer = 1
+        }
+        if (player2.contains(3) && player2.contains(5) && player2.contains(7)) {
+            winer = 2
+        }
+
 
         if (winer != -1) {
 
