@@ -10,11 +10,13 @@
     <ProgressBar
             style="@style/Widget.AppCompat.ProgressBar.Horizontal"
             android:indeterminate="true"
+            android:minHeight="24dip"
+            android:maxHeight="24dip"
             android:layout_width="0dp"
             android:layout_height="14dp"
             android:id="@+id/login_progressBar" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            android:foregroundTint="#E91E63" android:progressTint="#E91E63"/>
+            android:foregroundTint="#E91E63" android:progressTint="#E91E63" android:scrollbarStyle="insideOverlay"/>
 
     <EditText
             android:id="@+id/email_edittext_login"

@@ -26,6 +26,7 @@ class LoginActivity : AppCompatActivity() {
 
 
         login_button_login.setOnClickListener {
+            login_progressBar.scaleY = 4f
             login_progressBar2.visibility = View.VISIBLE
             login_progressBar.visibility = View.VISIBLE
             performLogin()
