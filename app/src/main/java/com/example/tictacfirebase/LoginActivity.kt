@@ -3,6 +3,7 @@ package com.example.tictacfirebase
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
@@ -19,10 +20,14 @@ class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
+        login_progressBar2.visibility = View.GONE
+        login_progressBar.visibility = View.GONE
 
 
 
         login_button_login.setOnClickListener {
+            login_progressBar2.visibility = View.VISIBLE
+            login_progressBar.visibility = View.VISIBLE
             performLogin()
         }
 
@@ -65,6 +70,8 @@ class LoginActivity : AppCompatActivity() {
                 Log.d(TAG, "putExtraUid: ${it.result?.user!!.uid}")
 
                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
+                login_progressBar.visibility = View.GONE
+                login_progressBar2.visibility = View.GONE
                 startActivity(intent)
             }
             .addOnFailureListener {
