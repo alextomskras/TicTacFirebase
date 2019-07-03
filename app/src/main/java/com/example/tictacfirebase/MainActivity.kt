@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.example.tictacfirebase.models.User
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
@@ -17,9 +18,13 @@ import com.google.firebase.database.ValueEventListener
 import com.google.firebase.iid.FirebaseInstanceId
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
-import com.letsbuildthatapp.kotlinmessenger.models.User
+
+
 import com.squareup.picasso.Picasso
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.util.*
 
 
@@ -219,43 +224,43 @@ open class MainActivity : AppCompatActivity() {
 
 
     fun buRequestEvent(view: View) {
-        var test4 = ""
-        var test3 = ""
-        val userUID = FirebaseAuth.getInstance().uid.toString()
-        var userDemail = etEmail.text.toString()
-        getImageProfile {
-            Log.e(TAG, "PlayerPictIT:" + it)
-            val pict1 = it
-        }
-        //unHide player2 icon
-        player2_text_View!!.visibility = View.VISIBLE
-        image_View_user2.visibility = View.VISIBLE
-        player2_text_View.text = "Player2-" + SplitString(userDemail)
+        GlobalScope.launch(Dispatchers.Main) {
+
+            val userUID = FirebaseAuth.getInstance().uid.toString()
+            var userDemail = etEmail.text.toString()
+
+            //unHide player2 icon
+            player2_text_View!!.visibility = View.VISIBLE
+            image_View_user2.visibility = View.VISIBLE
+            player2_text_View.text = "Player2-" + SplitString(userDemail)
 
 
+            val pict1 = GlobalScope.launch(Dispatchers.IO) {
+                getImageProfile {
+                    Log.e(TAG, "PlayerPictIT1:" + it)
+                    val pict1 = it
+                    Picasso.get().load(pict1)
+                        .into(image_View_user2)
+                }
+            }
 
-        val pict1 = getImageProfile {
-            Log.e(TAG, "PlayerPictIT1:" + it)
-            val pict1 = it
-            Picasso.get().load(pict1)
-                .into(image_View_user2)
-        }
-
-        Log.e(TAG, "PlayerPict1: $pict1")
+            Log.e(TAG, "PlayerPict1: $pict1")
 //        val pict =
 //            "https://firebasestorage.googleapis.com/v0/b/tictacfirebase-749a6.appspot.com/o/images%2F1f9038c8-2987-41c1-96ee-c4f6f9a3fcf9?alt=media&token=d3fd790b-a27a-4f57-ace9-0311a7846c23"
 //        Picasso.get().load(pict)
 //            .into(image_View_user2)
 
 ///{user_id}/{notification_id}
-        myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
-        myRef.child("latest-messages").child(userUID).push().child(SplitString(userDemail)).child("request").push()
-            .setValue(myEmail)
+            myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
+            myRef.child("latest-messages").child(userUID).push().child(SplitString(userDemail)).child("request").push()
+                .setValue(myEmail)
 
 
-        PlayerOnline(SplitString(myEmail!!) + SplitString(userDemail)) // husseinjena
-        PlayerSymbol = "X"
+            PlayerOnline(SplitString(myEmail!!) + SplitString(userDemail)) // husseinjena
+            PlayerSymbol = "X"
+        }
     }
+
 
     fun buAcceptEvent(view: View) {
         var userDemail = etEmail.text.toString()
@@ -323,158 +328,113 @@ open class MainActivity : AppCompatActivity() {
 
     }
 
-//    fun CheckButtonOnline(sessionID: String) {
-//        this.sessionID = sessionID
-//        myRef.child("PlayerOnline").child(sessionID).
-//            .addValueEventListener(object : ValueEventListener {
-//                override fun onDataChange(p0: DataSnapshot) {
-//                    try {
-//                        player1.clear()
-//                        player2.clear()
-////                        val list = ArrayList<String>(theHashMap.values())
-////                        val td = p0!!.value as String
-//                        val td = p0.value.toString()
-//                        val td1 = p0!!.value as HashMap<String,Int>
-//                        Log.d(TAG, "PlayerOn1: $td")
-//                        Log.d(TAG, "PlayerOn2: $td1")
-//                        if (td != null) {
-//                            myRef.child("PlayerOnline").child(sessionID).key
-//
-//                            var value: String?
-//                            for (key in td1.keys) {
-//                                value = td1[key].toString()
-//                                Log.d(TAG, "PlayerHash: $value")
-//
-//                                if (value != myEmail) {
-//                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
-//                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
-//                                } else {
-//                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
-//                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
-//                                }
-//
-//                                AutoPlay(key as Int)
-//
-//
-//                            }
-//
-//                        }
-//
-//                    } catch (ex: Exception) {
-//                        println("Somthing wrongex"+ex)
-//                    }
-//                }
-//
-//                override fun onCancelled(p0: DatabaseError) {
-//
-//                }
-//
-//            })
-//
-//
-//    }
 
     var number = 0
+
     fun IncommingCalls() {
-        myRef.child("users").child(SplitString(myEmail!!)).child("request")
-            .addValueEventListener(object : ValueEventListener {
+        GlobalScope.launch(Dispatchers.Main) {
+            myRef.child("latest-messages").removeValue()
+            myRef.child("users").child(SplitString(myEmail!!)).child("request")
 
-                override fun onDataChange(p0: DataSnapshot) {
+
+                .addValueEventListener(object : ValueEventListener {
 
 
-                    try {
-                        val td: HashMap<String, Any>
-                        td = p0.value as HashMap<String, Any>
-                        if (td != null) {
+                    override fun onDataChange(p0: DataSnapshot) {
 
-                            var value: String
-                            for (key in td.keys) {
-                                value = td[key] as String
-                                Log.d(TAG, "Incomming: $value")
-                                etEmail.setText(value)
+
+                        try {
+                            val td: HashMap<String, Any>
+                            td = p0.value as HashMap<String, Any>
+                            if (td != null) {
+
+                                var value: String
+                                for (key in td.keys) {
+                                    value = td[key] as String
+                                    Log.d(TAG, "Incomming: $value")
+                                    etEmail.setText(value)
 ///                                val notifyme = Notifications()
 //                                val notifyme = MyFirebaseMessagingService()
 ///                                notifyme.Notify(applicationContext, value + " want to play tic tac toy", number)
 //                                notifyme.sendNotification(RemoteMessage())
-                                perfotmFCMSendMessages()
-                                number++
-                                Log.d(TAG, "IncommingmyEmail: $myEmail")
-                                myRef.child("users").child(SplitString(myEmail!!)).child("request").setValue(true)
+                                    perfotmFCMSendMessages()
+                                    number++
+                                    Log.d(TAG, "IncommingmyEmail: $myEmail")
+                                    myRef.child("users").child(SplitString(myEmail!!)).child("request")
+                                        .setValue(true)
 
-                                break
+                                    break
+
+                                }
 
                             }
 
+                        } catch (ex: Exception) {
+                            println("Somthing EXwr" + ex)
+                            Toast.makeText(applicationContext, " Somthing EXwr+$ex", Toast.LENGTH_LONG).show()
                         }
+                    }
+
+                    override fun onCancelled(p0: DatabaseError) {
+
+                    }
+
+
+                })
+
+        }
+    }
+
+    //    fun readData(myCallback: (List<String>) -> Unit)
+    fun getImageProfile(function: (String) -> Unit): String {
+        var test1 = ""
+        GlobalScope.launch(Dispatchers.Main) {
+
+
+            var imgProfile = ""
+            var userDemail = etEmail.text.toString()
+            var splituserDemail = SplitString(userDemail)
+            Log.e(TAG, "UpstreamSplituserDemail: " + splituserDemail)
+
+            val ref = FirebaseDatabase.getInstance().getReference("/users/$splituserDemail")
+
+            //        databaseReference = FirebaseDatabase.getInstance().reference.child("Users").child(user_id)
+
+            ref.addValueEventListener(object : ValueEventListener {
+
+                override fun onDataChange(dataSnapshot: DataSnapshot) {
+                    try {
+                        val UserName = dataSnapshot.child("name").value as String?
+                        //                val ImageProfile = dataSnapshot.child("profileImageUrl").value as String?
+                        var ImageProfile = dataSnapshot.getValue(User::class.java)
+                        var test1 = ImageProfile!!.profileImageUrl
+
+
+
+                        Log.e(TAG, "UpstreamImageProfile: " + imgProfile)
+                        Log.e(TAG, "Upstream-test1: " + test1)
+                        function(test1)
+
 
                     } catch (ex: Exception) {
                         println("Somthing EXwr" + ex)
                         Toast.makeText(applicationContext, " Somthing EXwr+$ex", Toast.LENGTH_LONG).show()
                     }
+                    //
+
+
                 }
 
-                override fun onCancelled(p0: DatabaseError) {
+                override fun onCancelled(databaseError: DatabaseError) {
 
                 }
 
             })
-    }
-
-    //    fun readData(myCallback: (List<String>) -> Unit)
-    fun getImageProfile(function: (String) -> Unit): String {
-
-        var test1 = ""
-        var test2 = test1
-        var test3 = ""
-        var imgProfile = ""
-        var userDemail = etEmail.text.toString()
-        var splituserDemail = SplitString(userDemail)
-        Log.e(TAG, "UpstreamSplituserDemail: " + splituserDemail)
-
-        val ref = FirebaseDatabase.getInstance().getReference("/users/$splituserDemail")
-
-        //        databaseReference = FirebaseDatabase.getInstance().reference.child("Users").child(user_id)
-
-        ref.addValueEventListener(object : ValueEventListener {
-
-            override fun onDataChange(dataSnapshot: DataSnapshot) {
-                try {
-                    val UserName = dataSnapshot.child("name").value as String?
-                    //                val ImageProfile = dataSnapshot.child("profileImageUrl").value as String?
-                    var ImageProfile = dataSnapshot.getValue(User::class.java)
-                    var test1 = ImageProfile!!.profileImageUrl
-                    var test3 = test1
-                    var test4 = test1
-                    showProfileAndFriends(test3)
-                    Log.e(TAG, "UpstreamImageProfile: " + imgProfile)
-                    Log.e(TAG, "Upstream-test1: " + test1)
-                    function(test1)
+            Log.e(TAG, "Upstream-Return-test1: " + test1)
 
 
-                } catch (ex: Exception) {
-                    println("Somthing EXwr" + ex)
-                    Toast.makeText(applicationContext, " Somthing EXwr+$ex", Toast.LENGTH_LONG).show()
-                }
-                //
-
-
-            }
-
-            override fun onCancelled(databaseError: DatabaseError) {
-
-            }
-
-        })
-        Log.e(TAG, "Upstream-Return-test1: " + test3)
-        return test3
-
-
-    }
-
-    fun showProfileAndFriends(test3: String): String {
-        val test4 = test3
-        Log.e(TAG, "Upstream-Return-test4: " + test4)
-        return test4
+        }
+        return test1
     }
 
 

@@ -7,6 +7,13 @@
         android:layout_height="match_parent"
         android:background="@android:color/holo_green_light"
         tools:context=".LoginActivity">
+    <ProgressBar
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="4dp"
+            android:id="@+id/login_progressBar" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            android:foregroundTint="#E91E63"/>
 
     <EditText
             android:id="@+id/email_edittext_login"
