@@ -261,12 +261,7 @@ open class MainActivity : AppCompatActivity() {
             }
 
             Log.e(TAG, "PlayerPict1: $pict1")
-//        val pict =
-//            "https://firebasestorage.googleapis.com/v0/b/tictacfirebase-749a6.appspot.com/o/images%2F1f9038c8-2987-41c1-96ee-c4f6f9a3fcf9?alt=media&token=d3fd790b-a27a-4f57-ace9-0311a7846c23"
-//        Picasso.get().load(pict)
-//            .into(image_View_user2)
 
-///{user_id}/{notification_id}
             myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
             myRef.child("latest-messages").child(userUID).push().child(SplitString(userDemail)).child("request").push()
                 .setValue(myEmail)
@@ -303,7 +298,7 @@ open class MainActivity : AppCompatActivity() {
                         player2.clear()
 //                        val list = ArrayList<String>(theHashMap.values())
 //                        val td = p0!!.value as String
-                        val td = (if (p0 != null) p0.value else null) as? HashMap<String, Any>
+                        val td = (if (p0 != null) p0.value else null) as? HashMap<*, *>
 //                        val td1 = p0!!.value as java.util.HashMap<String,Any>
                         Log.d(TAG, "PlayerOn1: $td")
 //                        Log.d(TAG, "PlayerOn2: $td1")
@@ -321,8 +316,8 @@ open class MainActivity : AppCompatActivity() {
                                     ActivePlayer = if (PlayerSymbol === "X") 2 else 1
                                     Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
                                 }
-
-                                AutoPlay(key.toInt())
+                                Log.d(TAG, "PlayerKey: $key")
+                                AutoPlay(key.toString().toInt())
 
 
                             }
