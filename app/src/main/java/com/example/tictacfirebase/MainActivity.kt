@@ -18,14 +18,13 @@ import com.google.firebase.database.ValueEventListener
 import com.google.firebase.iid.FirebaseInstanceId
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
-
-
 import com.squareup.picasso.Picasso
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.util.*
+import kotlin.collections.ArrayList
 
 
 open class MainActivity : AppCompatActivity() {
@@ -217,23 +216,22 @@ open class MainActivity : AppCompatActivity() {
     fun AutoPlay(cellID: Int) {
 
 
-        val buSelect: Button?
-        buSelect = when {
-            cellID == 1 -> bu1
-            cellID == 2 -> bu2
-            cellID == 3 -> bu3
-            cellID == 4 -> bu4
-            cellID == 5 -> bu5
-            cellID == 6 -> bu6
-            cellID == 7 -> bu7
-            cellID == 8 -> bu8
-            cellID == 9 -> bu9
+        val buSelect: Button? = when (cellID) {
+            1 -> bu1
+            2 -> bu2
+            3 -> bu3
+            4 -> bu4
+            5 -> bu5
+            6 -> bu6
+            7 -> bu7
+            8 -> bu8
+            9 -> bu9
             else -> {
                 bu1
             }
         }
 
-        PlayGame(cellID, buSelect)
+        buSelect?.let { PlayGame(cellID, it) }
 
     }
 //    lateinit var ImageProfile = getImageProfile().toString()
@@ -287,42 +285,58 @@ open class MainActivity : AppCompatActivity() {
     //var cellID: String? =
     var sessionID: String? = null
     var PlayerSymbol: String? = null
+
     fun PlayerOnline(sessionID: String) {
-        this.sessionID = sessionID
+        this.sessionID = sessionID.toString()
+        Log.d(TAG, "PlayerOn0: $sessionID")
+
+        getPlayerOnline(sessionID) {
+            var trace1 = it
+            Log.d(TAG, "PlayerOngetPlayerOnline: $it")
+        }
         myRef.child("PlayerOnline").removeValue()
         myRef.child("PlayerOnline").child(sessionID)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(p0: DataSnapshot) {
+//        myRef.child("PlayerOnline")
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(dataSnapshot: DataSnapshot) {
+
                     try {
                         player1.clear()
                         player2.clear()
-//                        val list = ArrayList<String>(theHashMap.values())
-//                        val td = p0!!.value as String
-                        val td = (if (p0 != null) p0.value else null) as? HashMap<*, *>
-//                        val td1 = p0!!.value as java.util.HashMap<String,Any>
+                        val KeyName = dataSnapshot.value.toString()
+                        Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
+                        var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
+                        Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
+
+
+//
+//                      val td=dataSnapshot!!.value as HashMap<String,Any>
+                        val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
+//
                         Log.d(TAG, "PlayerOn1: $td")
-//                        Log.d(TAG, "PlayerOn2: $td1")
-                        if (td != null) {
-
-                            var value: String?
-                            for (key in td.keys) {
-                                value = td[key] as String
-                                Log.d(TAG, "PlayerHash: $value")
-
-                                if (value != myEmail) {
-                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
-                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
-                                } else {
-                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
-                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
-                                }
-                                Log.d(TAG, "PlayerKey: $key")
-                                AutoPlay(key.toString().toInt())
-
-
-                            }
-
-                        }
+//
+//                        if (td != null) {
+//
+//                            var value: String?
+//                            for (key in td.keys) {
+//                                value = td[key] as String
+//                                Log.d(TAG, "PlayerHash: $value")
+//
+//                                if (value != myEmail) {
+//                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
+//                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
+//                                } else {
+//                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
+//                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
+//                                }
+//                                Log.d(TAG, "PlayerKey: $key")
+//
+//                                AutoPlay(key.toString().toInt())
+//
+//
+//                            }
+//
+//                        }
 
                     } catch (ex: Exception) {
                         println("Somthing wrongex" + ex)
@@ -333,6 +347,75 @@ open class MainActivity : AppCompatActivity() {
                 override fun onCancelled(p0: DatabaseError) {
 
                 }
+
+            })
+
+
+    }
+
+    //    function: (String) -> Unit): String
+    fun getPlayerOnline(sessionID: String, function: (String) -> Unit) {
+        this.sessionID = sessionID
+        myRef.child("PlayerOnline").removeValue()
+        myRef.child("PlayerOnline").child(sessionID)
+//        myRef.child("PlayerOnline")
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(dataSnapshot: DataSnapshot) {
+                    try {
+                        player1.clear()
+                        player2.clear()
+                        val children = dataSnapshot.children
+                        children.forEach {
+                            println(it.toString())
+                            Log.d(TAG, "KeyName_PlayerOn4!!!!: " + it.toString())
+                        }
+
+                        val KeyName = dataSnapshot.key.toString()
+                        Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
+                        var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
+                        Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
+//
+//
+                        val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
+//
+                        Log.d(TAG, "PlayerOn1: $td")
+                        function(KeyName)
+                        Log.d(TAG, "PlayerOn1: $KeyName")
+//
+//                        if (td != null) {
+//
+//                            var value: String?
+//                            for (key in td.keys) {
+//                                value = td[key] as String
+//                                Log.d(TAG, "PlayerHash: $value")
+//
+//                                if (value != myEmail) {
+//                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
+//                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
+//                                } else {
+//                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
+//                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
+//                                }
+//                                Log.d(TAG, "PlayerKey: $key")
+//
+//                                AutoPlay(key.toString().toInt())
+//
+//
+//                            }
+//
+//                        }
+
+                    } catch (ex: Exception) {
+                        println("Somthing wrongex" + ex)
+                        Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
+                    }
+                }
+
+                override fun onCancelled(p0: DatabaseError) {
+                    println(p0.message.toString())
+
+                }
+
 
             })
 
@@ -381,8 +464,8 @@ open class MainActivity : AppCompatActivity() {
                             }
 
                         } catch (ex: Exception) {
-                            println("Somthing EXwr" + ex)
-                            Toast.makeText(applicationContext, " Somthing EXwr+$ex", Toast.LENGTH_LONG).show()
+                            println("Somthing EXwr!!!!!_: " + ex)
+                            Toast.makeText(applicationContext, "Somthing EXwr!!!!!_: $ex", Toast.LENGTH_LONG).show()
                         }
                     }
 
