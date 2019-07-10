@@ -368,6 +368,21 @@ open class MainActivity : AppCompatActivity() {
                         children.forEach {
                             println(it.toString())
                             Log.d(TAG, "KeyName_PlayerOn4!!!!: " + it.toString())
+                            if (it != null) {
+                                Log.d(TAG, "KeyName_PlayerOn5!!!!: " + it.key.toString())
+                                Log.d(TAG, "KeyName_PlayerOn6!!!!: " + it.value.toString())
+                                if (it.value.toString() != myEmail) {
+                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
+                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
+                                } else {
+                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
+                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
+                                }
+                                Log.d(TAG, "PlayerKey: " + it.key.toString())
+
+                                AutoPlay(it.key!!.toInt())
+
+                            }
                         }
 
                         val KeyName = dataSnapshot.key.toString()
@@ -378,9 +393,9 @@ open class MainActivity : AppCompatActivity() {
 //
                         val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
 //
-                        Log.d(TAG, "PlayerOn1: $td")
-                        function(KeyName)
-                        Log.d(TAG, "PlayerOn1: $KeyName")
+////                            Log.d(TAG, "PlayerOn1: $td")
+////                            function(KeyName)
+////                            Log.d(TAG, "PlayerOn1: $KeyName")
 //
 //                        if (td != null) {
 //
