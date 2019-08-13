@@ -385,13 +385,13 @@ open class MainActivity : AppCompatActivity() {
                             }
                         }
 
-                        val KeyName = dataSnapshot.key.toString()
-                        Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
-                        var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
-                        Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
-//
-//
-                        val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
+//                        val KeyName = dataSnapshot.key.toString()
+//                        Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
+//                        var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
+//                        Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
+////
+////
+//                        val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
 //
 ////                            Log.d(TAG, "PlayerOn1: $td")
 ////                            function(KeyName)
