@@ -62,7 +62,7 @@ open class MainActivity : AppCompatActivity() {
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
         val channelId = getString(R.string.default_notification_channel_id)
-        var b: Bundle = intent.extras
+        val b: Bundle = intent.extras
         myEmail = b.getString("email")
         Log.d(TAG, "getExtraEmail: $myEmail")
         supportActionBar?.title = "$channelId $myEmail"
@@ -72,7 +72,7 @@ open class MainActivity : AppCompatActivity() {
     private fun refreshTokens(): String? {
         val newToken = FirebaseInstanceId.getInstance().token
         Log.d("newToken", (newToken))
-        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
+//        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
         return newToken
 
 //        if (newToken != null) {

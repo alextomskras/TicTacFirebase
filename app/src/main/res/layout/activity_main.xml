@@ -21,13 +21,14 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="@string/other_player_email"
-                android:inputType="textEmailAddress"/>
+                android:inputType="textEmailAddress"
+                android:importantForAutofill="no" />
 
         <Button
                 android:id="@+id/burequest"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="3pt"
+                android:layout_marginStart="3pt"
                 android:layout_weight="1"
                 android:background="@color/blue"
                 android:onClick="buRequestEvent"
@@ -35,7 +36,7 @@
 
         <Button
                 android:onClick="buAcceptEvent"
-                android:layout_marginLeft="3pt"
+                android:layout_marginStart="3pt"
                 android:background="@color/green"
                 android:id="@+id/button5"
                 android:layout_width="wrap_content"
@@ -151,7 +152,7 @@
             app:civ_border_overlay="true"
             app:civ_border_color="#FF000000" android:layout_gravity="center"/>
     <TextView
-            android:text="Player2"
+            android:text="@string/player2_enemy_name"
             android:layout_width="80dp"
             android:layout_height="wrap_content" android:id="@+id/player2_text_View" android:textAlignment="center"
             android:textStyle="bold" android:textSize="12sp" android:layout_gravity="center"/>

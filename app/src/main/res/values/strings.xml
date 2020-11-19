@@ -6,4 +6,5 @@
     <string name="request">Request</string>
     <string name="accept">Accept</string>
     <string name="msg_token_fmt"></string>
+    <string name="player2_enemy_name">Player2</string>
 </resources>
