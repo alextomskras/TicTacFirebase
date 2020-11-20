@@ -38,7 +38,7 @@
                 android:onClick="buAcceptEvent"
                 android:layout_marginStart="3pt"
                 android:background="@color/green"
-                android:id="@+id/button5"
+                android:id="@+id/buAcceptEvent"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"

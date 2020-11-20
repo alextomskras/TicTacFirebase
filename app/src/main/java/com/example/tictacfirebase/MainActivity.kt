@@ -35,6 +35,7 @@ open class MainActivity : AppCompatActivity() {
 
     private val SENDER_ID = "793202519353"
     private val random = Random()
+
     //database instance
     private var database = FirebaseDatabase.getInstance()
     private var myRef = database.reference
@@ -254,7 +255,7 @@ open class MainActivity : AppCompatActivity() {
                     Log.e(TAG, "PlayerPictIT1:" + it)
                     val pict1 = it
                     Picasso.get().load(pict1)
-                        .into(image_View_user2)
+                            .into(image_View_user2)
                 }
             }
 
@@ -262,7 +263,7 @@ open class MainActivity : AppCompatActivity() {
 
             myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
             myRef.child("latest-messages").child(userUID).push().child(SplitString(userDemail)).child("request").push()
-                .setValue(myEmail)
+                    .setValue(myEmail)
 
 
             PlayerOnline(SplitString(myEmail!!) + SplitString(userDemail)) // husseinjena
@@ -275,6 +276,10 @@ open class MainActivity : AppCompatActivity() {
         var userDemail = etEmail.text.toString()
         myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
 
+        //unHide player2 icon
+        player2_text_View!!.visibility = View.VISIBLE
+        image_View_user2.visibility = View.VISIBLE
+        player2_text_View.text = "Player2-" + SplitString(userDemail)
 
         PlayerOnline(SplitString(userDemail) + SplitString(myEmail!!)) //husseinjena
         PlayerSymbol = "O"
@@ -287,7 +292,7 @@ open class MainActivity : AppCompatActivity() {
     var PlayerSymbol: String? = null
 
     fun PlayerOnline(sessionID: String) {
-        this.sessionID = sessionID.toString()
+        this.sessionID = sessionID
         Log.d(TAG, "PlayerOn0: $sessionID")
 
         getPlayerOnline(sessionID) {
@@ -297,23 +302,23 @@ open class MainActivity : AppCompatActivity() {
         myRef.child("PlayerOnline").removeValue()
         myRef.child("PlayerOnline").child(sessionID)
 //        myRef.child("PlayerOnline")
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(dataSnapshot: DataSnapshot) {
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(dataSnapshot: DataSnapshot) {
 
-                    try {
-                        player1.clear()
-                        player2.clear()
-                        val KeyName = dataSnapshot.value.toString()
-                        Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
-                        var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
-                        Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
+                        try {
+                            player1.clear()
+                            player2.clear()
+                            val KeyName = dataSnapshot.value.toString()
+                            Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
+                            var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
+                            Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
 
 
 //
 //                      val td=dataSnapshot!!.value as HashMap<String,Any>
-                        val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
+                            val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
 //
-                        Log.d(TAG, "PlayerOn1: $td")
+                            Log.d(TAG, "PlayerOn1: $td")
 //
 //                        if (td != null) {
 //
@@ -338,17 +343,17 @@ open class MainActivity : AppCompatActivity() {
 //
 //                        }
 
-                    } catch (ex: Exception) {
-                        println("Somthing wrongex" + ex)
-                        Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
+                        } catch (ex: Exception) {
+                            println("Somthing wrongex" + ex)
+                            Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
+                        }
                     }
-                }
 
-                override fun onCancelled(p0: DatabaseError) {
+                    override fun onCancelled(p0: DatabaseError) {
 
-                }
+                    }
 
-            })
+                })
 
 
     }
@@ -359,31 +364,31 @@ open class MainActivity : AppCompatActivity() {
         myRef.child("PlayerOnline").removeValue()
         myRef.child("PlayerOnline").child(sessionID)
 //        myRef.child("PlayerOnline")
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(dataSnapshot: DataSnapshot) {
-                    try {
-                        player1.clear()
-                        player2.clear()
-                        val children = dataSnapshot.children
-                        children.forEach {
-                            println(it.toString())
-                            Log.d(TAG, "KeyName_PlayerOn4!!!!: " + it.toString())
-                            if (it != null) {
-                                Log.d(TAG, "KeyName_PlayerOn5!!!!: " + it.key.toString())
-                                Log.d(TAG, "KeyName_PlayerOn6!!!!: " + it.value.toString())
-                                if (it.value.toString() != myEmail) {
-                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
-                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
-                                } else {
-                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
-                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(dataSnapshot: DataSnapshot) {
+                        try {
+                            player1.clear()
+                            player2.clear()
+                            val children = dataSnapshot.children
+                            children.forEach {
+                                println(it.toString())
+                                Log.d(TAG, "KeyName_PlayerOn4!!!!: " + it.toString())
+                                if (it != null) {
+                                    Log.d(TAG, "KeyName_PlayerOn5!!!!: " + it.key.toString())
+                                    Log.d(TAG, "KeyName_PlayerOn6!!!!: " + it.value.toString())
+                                    if (it.value.toString() != myEmail) {
+                                        ActivePlayer = if (PlayerSymbol === "X") 1 else 2
+                                        Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
+                                    } else {
+                                        ActivePlayer = if (PlayerSymbol === "X") 2 else 1
+                                        Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
+                                    }
+                                    Log.d(TAG, "PlayerKey: " + it.key.toString())
+
+                                    AutoPlay(it.key!!.toInt())
+
                                 }
-                                Log.d(TAG, "PlayerKey: " + it.key.toString())
-
-                                AutoPlay(it.key!!.toInt())
-
                             }
-                        }
 
 //                        val KeyName = dataSnapshot.key.toString()
 //                        Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
@@ -420,19 +425,19 @@ open class MainActivity : AppCompatActivity() {
 //
 //                        }
 
-                    } catch (ex: Exception) {
-                        println("Somthing wrongex" + ex)
-                        Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
+                        } catch (ex: Exception) {
+                            println("Somthing wrongex" + ex)
+                            Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
+                        }
                     }
-                }
 
-                override fun onCancelled(p0: DatabaseError) {
-                    println(p0.message.toString())
+                    override fun onCancelled(p0: DatabaseError) {
+                        println(p0.message.toString())
 
-                }
+                    }
 
 
-            })
+                })
 
 
     }
@@ -446,50 +451,50 @@ open class MainActivity : AppCompatActivity() {
             myRef.child("users").child(SplitString(myEmail!!)).child("request")
 
 
-                .addValueEventListener(object : ValueEventListener {
+                    .addValueEventListener(object : ValueEventListener {
 
 
-                    override fun onDataChange(p0: DataSnapshot) {
+                        override fun onDataChange(p0: DataSnapshot) {
 
 
-                        try {
-                            val td: HashMap<String, Any>
-                            td = p0.value as HashMap<String, Any>
-                            if (td != null) {
+                            try {
+                                val td: HashMap<String, Any>
+                                td = p0.value as HashMap<String, Any>
+                                if (td != null) {
 
-                                var value: String
-                                for (key in td.keys) {
-                                    value = td[key] as String
-                                    Log.d(TAG, "Incomming: $value")
-                                    etEmail.setText(value)
+                                    var value: String
+                                    for (key in td.keys) {
+                                        value = td[key] as String
+                                        Log.d(TAG, "Incomming: $value")
+                                        etEmail.setText(value)
 ///                                val notifyme = Notifications()
 //                                val notifyme = MyFirebaseMessagingService()
 ///                                notifyme.Notify(applicationContext, value + " want to play tic tac toy", number)
 //                                notifyme.sendNotification(RemoteMessage())
-                                    perfotmFCMSendMessages()
-                                    number++
-                                    Log.d(TAG, "IncommingmyEmail: $myEmail")
-                                    myRef.child("users").child(SplitString(myEmail!!)).child("request")
-                                        .setValue(true)
+                                        perfotmFCMSendMessages()
+                                        number++
+                                        Log.d(TAG, "IncommingmyEmail: $myEmail")
+                                        myRef.child("users").child(SplitString(myEmail!!)).child("request")
+                                                .setValue(true)
 
-                                    break
+                                        break
+
+                                    }
 
                                 }
 
+                            } catch (ex: Exception) {
+                                println("Somthing EXwr!!!!!_: " + ex)
+                                Toast.makeText(applicationContext, "Somthing EXwr!!!!!_: $ex", Toast.LENGTH_LONG).show()
                             }
-
-                        } catch (ex: Exception) {
-                            println("Somthing EXwr!!!!!_: " + ex)
-                            Toast.makeText(applicationContext, "Somthing EXwr!!!!!_: $ex", Toast.LENGTH_LONG).show()
                         }
-                    }
 
-                    override fun onCancelled(p0: DatabaseError) {
+                        override fun onCancelled(p0: DatabaseError) {
 
-                    }
+                        }
 
 
-                })
+                    })
 
         }
     }
@@ -562,11 +567,11 @@ open class MainActivity : AppCompatActivity() {
 //793202519353@gcm.googleapis.com
         val message = RemoteMessage.Builder(SENDER_ID + "@fcm.googleapis.com")
 
-            .setMessageId(Integer.toString(random.nextInt(9999)))
-            .addData("TEST1-- $fromId", "TEST1--  $toId")
+                .setMessageId(Integer.toString(random.nextInt(9999)))
+                .addData("TEST1-- $fromId", "TEST1--  $toId")
 //                    .addData(edt_key1.text.toString(), edt_value1.text.toString())
 //                    .addData(edt_key2.text.toString(), edt_value2.text.toString())
-            .build()
+                .build()
         Log.e(TAG, "UpstreamData: " + message)
 
         if (!message.data.isEmpty()) {
