@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">TicTacFirebase</string>
+    <string name="app_name">TicTacOnline</string>
     <string name="default_notification_channel_id">TicTacToyMessage</string>
     <string name="fcm_message">FCM-Message</string>
     <string name="other_player_email">Other player email</string>
