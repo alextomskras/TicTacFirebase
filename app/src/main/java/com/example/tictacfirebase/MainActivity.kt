@@ -33,8 +33,8 @@ open class MainActivity : AppCompatActivity() {
         val TAG = "MainActivity"
     }
 
-//    private val s = "793202519353"
-private val SENDER_ID = getString(R.string.SENDER_ID)
+    //    private val s = "793202519353"
+    private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
     //database instance
@@ -432,8 +432,8 @@ private val SENDER_ID = getString(R.string.SENDER_ID)
 //                        }
 
                         } catch (ex: Exception) {
-                            println("Somthing wrongex" + ex)
-                            Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
+                            println("getPlayerOnline error " + ex)
+                            Toast.makeText(applicationContext, " getPlayerOnline error $ex", Toast.LENGTH_LONG).show()
                         }
                     }
 
@@ -478,8 +478,11 @@ private val SENDER_ID = getString(R.string.SENDER_ID)
 ///                                notifyme.Notify(applicationContext, value + " want to play tic tac toy", number)
 //                                notifyme.sendNotification(RemoteMessage())
                                         perfotmFCMSendMessages()
+                                        //Release_ACCEPT_BUTTON
+                                        buAcceptEvent.isEnabled = true
                                         number++
-                                        Log.d(TAG, "IncommingmyEmail: $myEmail")
+                                        Log.d(TAG, "Incomming_myEmail: $myEmail")
+                                        Toast.makeText(applicationContext, "Incomming_myEmail: $myEmail", Toast.LENGTH_LONG).show()
                                         myRef.child("users").child(SplitString(myEmail!!)).child("request")
                                                 .setValue(true)
 
