@@ -205,9 +205,10 @@ open class MainActivity : AppCompatActivity() {
 
             if (winer == 1) {
                 android.widget.Toast.makeText(this, " Player 1  win the game", android.widget.Toast.LENGTH_LONG).show()
+                restartGame()
             } else {
                 android.widget.Toast.makeText(this, " Player 2  win the game", android.widget.Toast.LENGTH_LONG).show()
-
+                restartGame()
             }
 
         }
@@ -279,6 +280,7 @@ open class MainActivity : AppCompatActivity() {
         //unHide player2 icon
         player2_text_View!!.visibility = View.VISIBLE
         image_View_user2.visibility = View.VISIBLE
+
         player2_text_View.text = "Player2-" + SplitString(userDemail)
 
         PlayerOnline(SplitString(userDemail) + SplitString(myEmail!!)) //husseinjena
@@ -584,6 +586,10 @@ open class MainActivity : AppCompatActivity() {
 
         fm.send(message)
 //        }
+    }
+
+    fun restartGame() {
+        Toast.makeText(this, " RESTART the game", Toast.LENGTH_LONG).show()
     }
 
 
