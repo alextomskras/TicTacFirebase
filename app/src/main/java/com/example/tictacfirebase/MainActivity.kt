@@ -53,6 +53,9 @@ open class MainActivity : AppCompatActivity() {
         player2_text_View!!.visibility = View.GONE
         image_View_user2!!.visibility = View.GONE
 
+        //Block_ACCEPT_BUTTON
+        buAcceptEvent.isEnabled = false
+
         refreshTokens()
 
 //        var tokenID = MyFirebaseMessagingService()
@@ -66,7 +69,7 @@ open class MainActivity : AppCompatActivity() {
         val b: Bundle = intent.extras
         myEmail = b.getString("email")
         Log.d(TAG, "getExtraEmail: $myEmail")
-        supportActionBar?.title = "$channelId $myEmail"
+        supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
         IncommingCalls()
     }
 
