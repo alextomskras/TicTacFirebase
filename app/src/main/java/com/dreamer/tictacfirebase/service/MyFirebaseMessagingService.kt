@@ -1,4 +1,4 @@
-package com.example.tictacfirebase.service
+package com.dreamer.tictacfirebase.service
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,8 +12,8 @@ import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import com.example.tictacfirebase.LoginActivity
-import com.example.tictacfirebase.R
+import com.dreamer.tictacfirebase.LoginActivity
+import com.dreamer.tictacfirebase.R
 import com.google.android.gms.tasks.OnCompleteListener
 
 

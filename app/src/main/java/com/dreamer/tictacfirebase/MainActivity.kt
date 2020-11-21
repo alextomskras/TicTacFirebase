@@ -1,4 +1,4 @@
-package com.example.tictacfirebase
+package com.dreamer.tictacfirebase
 
 
 import android.os.Bundle
@@ -7,8 +7,8 @@ import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.tictacfirebase.models.User
-import com.example.tictacfirebase.service.MyFirebaseMessagingService
+import com.dreamer.tictacfirebase.models.User
+import com.dreamer.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -33,8 +33,10 @@ open class MainActivity : AppCompatActivity() {
         val TAG = "MainActivity"
     }
 
-    //    private val s = "793202519353"
-    private val SENDER_ID = getString(R.string.SENDER_ID)
+    private val s = "793202519353"
+    private val SENDER_ID = s
+
+    //            getString(R.string.SENDER_ID)
     private val random = Random()
 
     //database instance
@@ -89,15 +91,15 @@ open class MainActivity : AppCompatActivity() {
         val buSelected = view as Button
         var cellID = 0
         when (buSelected.id) {
-            com.example.tictacfirebase.R.id.bu1 -> cellID = 1
-            com.example.tictacfirebase.R.id.bu2 -> cellID = 2
-            com.example.tictacfirebase.R.id.bu3 -> cellID = 3
-            com.example.tictacfirebase.R.id.bu4 -> cellID = 4
-            com.example.tictacfirebase.R.id.bu5 -> cellID = 5
-            com.example.tictacfirebase.R.id.bu6 -> cellID = 6
-            com.example.tictacfirebase.R.id.bu7 -> cellID = 7
-            com.example.tictacfirebase.R.id.bu8 -> cellID = 8
-            com.example.tictacfirebase.R.id.bu9 -> cellID = 9
+            R.id.bu1 -> cellID = 1
+            R.id.bu2 -> cellID = 2
+            R.id.bu3 -> cellID = 3
+            R.id.bu4 -> cellID = 4
+            R.id.bu5 -> cellID = 5
+            R.id.bu6 -> cellID = 6
+            R.id.bu7 -> cellID = 7
+            R.id.bu8 -> cellID = 8
+            R.id.bu9 -> cellID = 9
 
         }
         Toast.makeText(this, "ID:" + cellID, Toast.LENGTH_LONG).show()

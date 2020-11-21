@@ -1,4 +1,4 @@
-package com.example.tictacfirebase
+package com.dreamer.tictacfirebase
 
 import android.app.Activity
 import android.content.Intent
@@ -9,8 +9,8 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.tictacfirebase.models.User
-import com.example.tictacfirebase.service.MyFirebaseMessagingService
+import com.dreamer.tictacfirebase.models.User
+import com.dreamer.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.iid.FirebaseInstanceId
