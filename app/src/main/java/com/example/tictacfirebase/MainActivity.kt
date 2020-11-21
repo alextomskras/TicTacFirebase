@@ -33,7 +33,8 @@ open class MainActivity : AppCompatActivity() {
         val TAG = "MainActivity"
     }
 
-    private val SENDER_ID = "793202519353"
+//    private val s = "793202519353"
+private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
     //database instance
