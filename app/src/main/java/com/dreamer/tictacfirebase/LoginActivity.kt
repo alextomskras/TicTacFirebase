@@ -82,7 +82,7 @@ class LoginActivity : AppCompatActivity() {
 
     private fun refreshTokens(stripEmail: String): String? {
         val newToken = FirebaseInstanceId.getInstance().token
-        
+
         //view our firebase tokens
         Log.d("newToken", (newToken))
 //        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
