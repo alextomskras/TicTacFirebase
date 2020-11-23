@@ -8,7 +8,6 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FLASHLIGHT" />
 
-
     <application
             android:allowBackup="true"
             android:icon="@mipmap/ic_launcher"
@@ -16,38 +15,29 @@
             android:roundIcon="@mipmap/ic_launcher_round"
             android:supportsRtl="true"
             android:theme="@style/AppTheme">
-        <activity android:name="com.dreamer.tictacfirebase.registerActivity">
-
+        <activity android:name=".GameOverActivity"></activity>
+        <activity android:name=".registerActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name="com.dreamer.tictacfirebase.LoginActivity"></activity>
-        <activity android:name="com.dreamer.tictacfirebase.MainActivity">
-
-        </activity>
-
-        <!--FCM-->
+        <activity android:name=".LoginActivity" />
+        <activity android:name=".MainActivity"></activity> <!-- FCM -->
         <meta-data
                 android:name="com.google.firebase.messaging.default_notification_icon"
-                android:resource="@drawable/ic_fire_emoji"/>
+                android:resource="@drawable/ic_fire_emoji" />
         <meta-data
                 android:name="com.google.firebase.messaging.default_notification_channel_id"
-                android:value="@string/default_notification_channel_id"/>
+                android:value="@string/default_notification_channel_id" />
 
-        <service android:name="com.dreamer.tictacfirebase.service.MyFirebaseMessagingService">
+        <service android:name=".service.MyFirebaseMessagingService">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
                 <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
             </intent-filter>
         </service>
-        <!--<service android:name=".service.MyFirebaseInstanceIDService">-->
-        <!--<intent-filter>-->
-        <!--<action android:name="com.google.firebase.INSTANCE_ID_EVENT" />-->
-        <!--</intent-filter>-->
-        <!--</service>-->
     </application>
 
 </manifest>
