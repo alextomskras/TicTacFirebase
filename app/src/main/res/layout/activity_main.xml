@@ -26,14 +26,17 @@
                 android:importantForAutofill="no" />
 
         <Button
+
                 android:id="@+id/burequest"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_marginStart="3pt"
                 android:layout_weight="1"
+
                 android:background="@drawable/rounded_button_request"
                 android:onClick="buRequestEvent"
-                android:text="@string/request" />
+                android:text="@string/request"
+                android:elevation="8dp" />
 
         <Button
                 android:onClick="buAcceptEvent"
@@ -43,6 +46,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:elevation="8dp"
                 android:text="@string/accept" />
     </LinearLayout>
 
