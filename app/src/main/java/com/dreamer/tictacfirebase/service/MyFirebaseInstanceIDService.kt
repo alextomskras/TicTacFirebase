@@ -17,15 +17,15 @@ class MyFirebaseInstanceIDService : FirebaseMessagingService() {
         Log.d("Token", mToken)
     }
 
-    override fun onNewToken(s: String?) {
-        super.onNewToken(s)
-        Log.d("NEW_TOKEN", s)
+    override fun onNewToken(tokens: String) {
+        super.onNewToken(tokens)
+        Log.d("NEW_TOKEN", tokens)
 
 
         val newRegistrationToken = FirebaseInstanceId.getInstance().instanceId.toString()
         Log.d(TAG, "TOKEN_$newRegistrationToken")
         Toast.makeText(this, "Failed create Token: ${newRegistrationToken}", Toast.LENGTH_SHORT)
-            .show()
+                .show()
 
         if (FirebaseAuth.getInstance().currentUser != null)
             addTokenToFirestore(newRegistrationToken)

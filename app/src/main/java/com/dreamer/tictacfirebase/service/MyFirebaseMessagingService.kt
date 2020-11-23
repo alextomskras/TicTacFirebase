@@ -28,15 +28,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     val TAG = "FCM_Service"
 
 
-    override fun onMessageReceived(remoteMessage: RemoteMessage?) {
+    override fun onMessageReceived(remoteMessage: RemoteMessage) {
         // TODO: Handle FCM messages here.
         // If the application is in the foreground handle both data and notification messages here.
         // Also if you intend on generating your own notifications as a result of a received FCM
         // message, here is where that should be initiated.
-        Log.d(TAG, "From: " + remoteMessage!!.from)
+        Log.d(TAG, "From: " + remoteMessage.from)
         Log.d(TAG, "Notification Message Body: " + remoteMessage.notification!!.body!!)
         // Check if message contains a data payload.
-        remoteMessage.data?.isNotEmpty()?.let {
+        remoteMessage.data.isNotEmpty().let {
             Log.d(TAG, "Message data payload: " + remoteMessage.data)
         }
         sendNotification(remoteMessage)
@@ -47,7 +47,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
 
-    override fun onNewToken(s: String?) {
+    override fun onNewToken(s: String) {
         super.onNewToken(s)
         val deviceToken = s
         Log.d("NEW_TOKEN", deviceToken)
@@ -56,7 +56,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val newRegistrationToken = FirebaseInstanceId.getInstance().instanceId.toString()
         Log.d(TAG, "TOKEN_$newRegistrationToken")
         Toast.makeText(this, "Failed create Token: ${newRegistrationToken}", Toast.LENGTH_SHORT)
-            .show()
+                .show()
 
 //        if (FirebaseAuth.getInstance().currentUser != null)
 //            addTokenToFirestore(newRegistrationToken)
@@ -153,9 +153,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         // Since android Oreo notification channel is needed.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                channelId,
-                "Channel human readable title",
-                NotificationManager.IMPORTANCE_HIGH
+                    channelId,
+                    "Channel human readable title",
+                    NotificationManager.IMPORTANCE_HIGH
             )
             channel.description = "My channel description"
             channel.enableLights(true)
@@ -167,13 +167,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
 
-    override fun onMessageSent(msgId: String?) {
-        Log.e(TAG, "onMessageSent: " + msgId!!)
+    override fun onMessageSent(msgId: String) {
+        Log.e(TAG, "onMessageSent: " + msgId)
     }
 
-    override fun onSendError(msgId: String?, e: Exception?) {
-        Log.e(TAG, "onSendError: " + msgId!!)
-        Log.e(TAG, "Exception: " + e!!)
+    override fun onSendError(msgId: String, e: Exception) {
+        Log.e(TAG, "onSendError: " + msgId)
+        Log.e(TAG, "Exception: " + e)
     }
 
 

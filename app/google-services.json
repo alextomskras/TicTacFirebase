@@ -10,7 +10,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:793202519353:android:50756e48589355b6",
         "android_client_info": {
-          "package_name": "com.example.tictacfirebase"
+          "package_name": "com.dreamer.tictacfirebase"
         }
       },
       "oauth_client": [
@@ -18,7 +18,7 @@
           "client_id": "793202519353-i873jm56u1ofsbehcco89bpiqjdj2qo6.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.tictacfirebase",
+            "package_name": "com.dreamer.tictacfirebase",
             "certificate_hash": "f21edc75819574eb1bd5b5c28dc0b255bef77593"
           }
         },

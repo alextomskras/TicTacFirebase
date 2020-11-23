@@ -82,16 +82,18 @@ class LoginActivity : AppCompatActivity() {
 
     private fun refreshTokens(stripEmail: String): String? {
         val newToken = FirebaseInstanceId.getInstance().token
+        
+        //view our firebase tokens
         Log.d("newToken", (newToken))
-        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
+//        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
 
 
         if (newToken != null) {
             MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
             val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
             ref.setValue(newToken)
-                .addOnSuccessListener {
-                    Log.d(TAG, "Finally we saved the Token to Firebase Database")
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Finally we saved the Token to Firebase Database")
                 }
                 .addOnFailureListener {
                     Log.d(TAG, "Failed to set value to database: ${it.message}")

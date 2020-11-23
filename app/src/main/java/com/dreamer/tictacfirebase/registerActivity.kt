@@ -97,7 +97,7 @@ class registerActivity : AppCompatActivity() {
                     if (!it.isSuccessful) return@addOnCompleteListener
 
                     // else if successful
-                    Log.d(TAG, "Successfully created user with uid: ${it.result!!.user.uid}")
+                    Log.d(TAG, "Successfully created user with uid: ${it.result!!.user?.uid}")
 
                     uploadImageToFirebaseStorage()
                 }
@@ -173,8 +173,10 @@ class registerActivity : AppCompatActivity() {
 
     private fun refreshTokens(): String? {
         val newToken = FirebaseInstanceId.getInstance().token
+        //view our firebase tokens
         Log.d("newToken", (newToken))
-        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
+
+//        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
 
 
         if (newToken != null) {
