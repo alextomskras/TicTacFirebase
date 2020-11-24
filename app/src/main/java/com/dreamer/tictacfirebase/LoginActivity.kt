@@ -33,6 +33,13 @@ class LoginActivity : AppCompatActivity() {
         }
 
         back_to_register_login.setOnClickListener {
+            val intent = Intent(this, registerActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+
+//            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
+            login_progressBar.visibility = View.VISIBLE
+            login_progressBar2.visibility = View.VISIBLE
+            startActivity(intent)
             finish()
         }
     }

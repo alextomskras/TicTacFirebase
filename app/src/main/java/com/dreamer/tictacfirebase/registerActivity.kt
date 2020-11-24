@@ -156,7 +156,7 @@ class registerActivity : AppCompatActivity() {
                     Log.d(TAG, "putExtraEmail: $email")
                     intent.putExtra("uid", uid)
                     Log.d(TAG, "putExtraUid: ${uid}")
-                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP))
 //                refreshTokens()
                     register_progressBar.visibility = View.GONE
                     startActivity(intent)

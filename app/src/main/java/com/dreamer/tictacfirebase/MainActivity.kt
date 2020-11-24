@@ -602,6 +602,8 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, " RESTART the game", Toast.LENGTH_LONG).show()
         val intent = Intent(this@MainActivity, GameOverActivity::class.java)
         intent.putExtra("key", "Kotlin")
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+//        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
         startActivity(intent)
 //        onStop()
 //        finishAffinity()
