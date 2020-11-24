@@ -1,5 +1,6 @@
 package com.dreamer.tictacfirebase.service
 
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -8,15 +9,12 @@ import android.content.Intent
 import android.graphics.Color
 import android.media.RingtoneManager
 import android.os.Build
-
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.dreamer.tictacfirebase.LoginActivity
 import com.dreamer.tictacfirebase.R
 import com.google.android.gms.tasks.OnCompleteListener
-
-
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.iid.FirebaseInstanceId
 import com.google.firebase.messaging.FirebaseMessagingService
