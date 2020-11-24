@@ -1,6 +1,7 @@
 package com.dreamer.tictacfirebase
 
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -599,6 +600,11 @@ open class MainActivity : AppCompatActivity() {
 
     fun restartGame() {
         Toast.makeText(this, " RESTART the game", Toast.LENGTH_LONG).show()
+        val intent = Intent(this@MainActivity, GameOverActivity::class.java)
+        intent.putExtra("key", "Kotlin")
+//        onStop()
+//        finishAffinity()
+        finish()
     }
 
 
