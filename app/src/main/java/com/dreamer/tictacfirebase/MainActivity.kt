@@ -602,6 +602,7 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, " RESTART the game", Toast.LENGTH_LONG).show()
         val intent = Intent(this@MainActivity, GameOverActivity::class.java)
         intent.putExtra("key", "Kotlin")
+        startActivity(intent)
 //        onStop()
 //        finishAffinity()
         finish()
