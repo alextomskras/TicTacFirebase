@@ -47,6 +47,7 @@ class registerActivity : AppCompatActivity() {
             val intent = Intent(this, LoginActivity::class.java)
 
             startActivity(intent)
+            finish()
         }
 
         select_photo_button_register.setOnClickListener {
@@ -55,6 +56,7 @@ class registerActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_PICK)
             intent.type = "image/*"
             startActivityForResult(intent, 0)
+
         }
     }
 
@@ -158,6 +160,7 @@ class registerActivity : AppCompatActivity() {
 //                refreshTokens()
                     register_progressBar.visibility = View.GONE
                     startActivity(intent)
+                    finish()
 
                 }
                 .addOnFailureListener {

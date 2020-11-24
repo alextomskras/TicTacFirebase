@@ -74,6 +74,7 @@ class LoginActivity : AppCompatActivity() {
                 login_progressBar.visibility = View.GONE
                 login_progressBar2.visibility = View.GONE
                 startActivity(intent)
+                finish()
             }
             .addOnFailureListener {
                 Toast.makeText(this, "Failed to log in: ${it.message}", Toast.LENGTH_SHORT).show()
