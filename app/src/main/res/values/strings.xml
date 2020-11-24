@@ -10,4 +10,5 @@
     <string name="btRestartGame">Restart</string>
     <string name="btExitGame">Exit</string>
     <string name="tvGameOver">GameOver</string>
+    <string name="btRestartGameTip">Restart Game</string>
 </resources>
