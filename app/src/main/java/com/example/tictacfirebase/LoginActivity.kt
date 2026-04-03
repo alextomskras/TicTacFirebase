@@ -108,7 +108,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun splitString(str: String): String {
-        var split = str.split("@")
+        val split = str.split("@")
         return split[0]
     }
 
