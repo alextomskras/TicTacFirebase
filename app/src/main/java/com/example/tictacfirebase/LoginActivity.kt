@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.example.tictacfirebase.databinding.ActivityLoginBinding
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -15,31 +16,33 @@ class LoginActivity : AppCompatActivity() {
     companion object {
         val TAG = "LoginActivity"
     }
+    
+    private lateinit var binding: ActivityLoginBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_login)
-        login_progressBar2.visibility = View.GONE
-        login_progressBar.visibility = View.GONE
+        binding = ActivityLoginBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        binding.loginProgressBar2.visibility = View.GONE
+        binding.loginProgressBar.visibility = View.GONE
 
-
-
-        login_button_login.setOnClickListener {
-            login_progressBar.scaleY = 4f
-            login_progressBar2.visibility = View.VISIBLE
-            login_progressBar.visibility = View.VISIBLE
+        binding.loginButtonLogin.setOnClickListener {
+            binding.loginProgressBar.scaleY = 4f
+            binding.loginProgressBar2.visibility = View.VISIBLE
+            binding.loginProgressBar.visibility = View.VISIBLE
             performLogin()
         }
 
-        back_to_register_login.setOnClickListener {
+        binding.backToRegisterLogin.setOnClickListener {
             finish()
         }
     }
 
     private fun performLogin() {
-        val email = email_edittext_login.text.toString()
-        val stripEmail = SplitString(email)
-        val password = password_edittext_login.text.toString()
+        val email = binding.emailEdittextLogin.text.toString()
+        val stripEmail = splitString(email)
+        val password = binding.passwordEdittextLogin.text.toString()
 
 
 //        val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
@@ -70,8 +73,8 @@ class LoginActivity : AppCompatActivity() {
                 Log.d(TAG, "putExtraUid: ${it.result?.user!!.uid}")
 
                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
-                login_progressBar.visibility = View.GONE
-                login_progressBar2.visibility = View.GONE
+                binding.loginProgressBar.visibility = View.GONE
+                binding.loginProgressBar2.visibility = View.GONE
                 startActivity(intent)
             }
             .addOnFailureListener {
@@ -104,7 +107,7 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    fun SplitString(str: String): String {
+    private fun splitString(str: String): String {
         var split = str.split("@")
         return split[0]
     }
