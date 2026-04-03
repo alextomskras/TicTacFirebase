@@ -13,12 +13,14 @@ import com.example.tictacfirebase.game.GameManager
 import com.example.tictacfirebase.game.WinResult
 import com.example.tictacfirebase.model.GameState
 import com.example.tictacfirebase.model.GameStatus
+import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.models.User
 import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.example.tictacfirebase.utils.AppConstants
 import com.example.tictacfirebase.utils.NetworkMonitor
 import com.example.tictacfirebase.utils.splitEmail
+import com.example.tictacfirebase.utils.splitEmailFull
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
@@ -143,6 +145,68 @@ open class MainActivity : AppCompatActivity() {
         
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
+    }
+    
+    /**
+     * Настройка прослушивания входящих запросов на игру
+     * Использует lifecycleScope для автоматической отмены при уничтожении Activity
+     */
+    private fun setupIncomingRequestsListener() {
+        myEmail?.let { email ->
+            incomingRequestsListener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    try {
+                        val td = snapshot.value as? HashMap<String, Any>
+                        if (td != null) {
+                            var value: String
+                            for (key in td.keys) {
+                                value = td[key] as String
+                                Log.d(TAG, "Incoming request from: $value")
+                                etEmail.setText(value)
+                                
+                                // Отправляем уведомление (FCM)
+                                perfotmFCMSendMessages()
+                                
+                                // Активируем кнопку принятия запроса
+                                buAcceptEvent.isEnabled = true
+                                buAcceptEvent.tag = "enabled"
+                                
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Игрок $value хочет сыграть!",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                
+                                // Очищаем запрос после обработки
+                                myRef.child("users")
+                                    .child(email.splitEmail())
+                                    .child("request")
+                                    .setValue(true)
+                                
+                                break
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error processing incoming request: ${e.message}")
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Ошибка обработки запроса: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e(TAG, "Error listening for incoming requests: ${error.message}")
+                }
+            }
+            
+            // Подписываемся на обновления
+            myRef.child("users")
+                .child(email.splitEmail())
+                .child("request")
+                .addValueEventListener(incomingRequestsListener!!)
+        }
     }
     
     override fun onDestroy() {
