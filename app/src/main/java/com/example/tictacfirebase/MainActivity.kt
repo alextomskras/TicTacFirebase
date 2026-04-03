@@ -9,27 +9,19 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.example.tictacfirebase.game.GameManager
-import com.example.tictacfirebase.game.WinResult
-import com.example.tictacfirebase.model.GameState
-import com.example.tictacfirebase.model.GameStatus
-import com.example.tictacfirebase.models.User
+import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.example.tictacfirebase.utils.AppConstants
+import com.example.tictacfirebase.utils.NetworkMonitor
 import com.example.tictacfirebase.utils.splitEmail
+import com.example.tictacfirebase.utils.splitEmailFull
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import coil.load
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.*
@@ -43,41 +35,18 @@ open class MainActivity : AppCompatActivity() {
     private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
-    // Repository для работы с Firebase
-    private lateinit var gameRepository: GameRepository
-    
-    // Менеджер игры для локальной логики
-    private lateinit var gameManager: GameManager
-
-    // Database instance (оставляем для обратной совместимости, но постепенно убираем)
-    private var database = FirebaseDatabase.getInstance()
-    private var myRef = database.reference
-
     var myEmail: String? = null
 
     lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
     
-    // Переменные для управления подписками
-    private var gameSessionListener: ValueEventListener? = null
-    private var incomingRequestsListener: ValueEventListener? = null
-    private var userProfileListener: ValueEventListener? = null
-    
-    // Coroutine jobs для отмены в onDestroy
-    private var gameSessionJob: Job? = null
-    private var incomingRequestsJob: Job? = null
-
     // UI Views
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
     private lateinit var noInternetOverlay: android.widget.FrameLayout
     
-    // Игровые переменные
-    private var sessionID: String? = null
-    private var playerSymbol: String? = null
-    private var activePlayer = 1
-    private var player1 = ArrayList<Int>()
-    private var player2 = ArrayList<Int>()
+    // GameViewModel для управления состоянием игры и сетью
+    private lateinit var gameViewModel: GameViewModel
     
     // Image views
     private val image_View_user2 by lazy { findViewById<de.hdodenhof.circleimageview.CircleImageView>(com.example.tictacfirebase.R.id.image_View_user2) }
@@ -104,9 +73,8 @@ open class MainActivity : AppCompatActivity() {
         tvConnectionStatus = findViewById(com.example.tictacfirebase.R.id.tvConnectionStatus)
         noInternetOverlay = findViewById(com.example.tictacfirebase.R.id.noInternetOverlay)
         
-        // Инициализация repository и game manager
-        gameRepository = GameRepository()
-        gameManager = GameManager()
+        // Инициализация GameRepository для передачи в ViewModel
+        val gameRepository = GameRepository()
         
         //Hide img+player2name
         player2_text_View.visibility = View.GONE
@@ -128,30 +96,88 @@ open class MainActivity : AppCompatActivity() {
         // Обновляем статус подключения
         updateConnectionStatus(getString(R.string.connecting))
         
+        // Инициализация GameViewModel с временным gameId (будет обновлен при создании/присоединении к игре)
+        gameViewModel = ViewModelProvider(
+            this,
+            GameViewModelFactory(gameRepository, "temp_game_id", this)
+        )[GameViewModel::class.java]
+        
+        // Наблюдаем за состоянием сети через ViewModel и показываем/скрываем оверлей
+        setupNetworkObserver()
+        
+        // Наблюдаем за UI эффектами от ViewModel (toast, навигация)
+        setupUiEffectObserver()
+        
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
     }
     
+    /**
+     * Настройка наблюдения за UI эффектами от ViewModel
+     * Показывает toast сообщения и обрабатывает навигацию
+     */
+    private fun setupUiEffectObserver() {
+        lifecycleScope.launch {
+            gameViewModel.uiEffect.collect { effect ->
+                when (effect) {
+                    is com.example.tictacfirebase.model.UiEffect.ShowToast -> {
+                        Toast.makeText(this@MainActivity, effect.message, Toast.LENGTH_SHORT).show()
+                    }
+                    is com.example.tictacfirebase.model.UiEffect.NavigateTo -> {
+                        // TODO: Реализовать навигацию
+                    }
+                    com.example.tictacfirebase.model.UiEffect.GameEnded -> {
+                        // TODO: Показать диалог конца игры
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+    
+    /**
+     * Настройка прослушивания входящих запросов на игру
+     * Использует lifecycleScope для автоматической отмены при уничтожении Activity
+     */
+    private fun setupIncomingRequestsListener() {
+        myEmail?.let { email ->
+            lifecycleScope.launch {
+                try {
+                    // Слушаем запросы через Flow из ViewModel
+                    gameViewModel.observeGameRequests(email.splitEmail()).collect { requesterEmail ->
+                        Log.d(TAG, "Incoming request from: $requesterEmail")
+                        etEmail.setText(requesterEmail)
+                        
+                        // Отправляем уведомление (FCM)
+                        perfotmFCMSendMessages()
+                        
+                        // Активируем кнопку принятия запроса
+                        buAcceptEvent.isEnabled = true
+                        buAcceptEvent.tag = "enabled"
+                        
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Игрок $requesterEmail хочет сыграть!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        
+                        // Очищаем запрос после обработки
+                        gameViewModel.clearGameRequest(email.splitEmail())
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error processing incoming request: ${e.message}")
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Ошибка обработки запроса: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
-        // Отменяем все корутины
-        gameSessionJob?.cancel()
-        incomingRequestsJob?.cancel()
-        
-        // Удаляем слушатели Firebase
-        sessionID?.let {
-            if (gameSessionListener != null) {
-                myRef.child("PlayerOnline").child(it).removeEventListener(gameSessionListener!!)
-            }
-        }
-        
-        myEmail?.let { email ->
-            if (incomingRequestsListener != null) {
-                myRef.child("users").child(email.splitEmail()).child("request")
-                    .removeEventListener(incomingRequestsListener!!)
-            }
-        }
-        
         // Скрываем индикатор загрузки
         showLoading(false)
     }
@@ -189,6 +215,32 @@ open class MainActivity : AppCompatActivity() {
         buAcceptEvent.isEnabled = !show && buAcceptEvent.tag == "enabled"
         etEmail.isEnabled = !show
     }
+    
+    /**
+     * Настройка наблюдения за состоянием сети через GameViewModel
+     * Показывает/скрывает оверлей при потере/восстановлении подключения
+     */
+    private fun setupNetworkObserver() {
+        lifecycleScope.launch {
+            NetworkMonitor.observeNetworkConnectivity(this@MainActivity).collect { isOnline ->
+                Log.d(TAG, "Network status changed: isOnline=$isOnline")
+                
+                // Обновляем текст статуса подключения
+                val statusText = if (isOnline) {
+                    getString(R.string.connected)
+                } else {
+                    getString(R.string.no_internet)
+                }
+                updateConnectionStatus(statusText)
+                
+                // Показываем/скрываем оверлей
+                showNoInternetOverlay(!isOnline)
+                
+                // Также обновляем состояние в ViewModel
+                gameViewModel.observeNetworkStatusForUi(isOnline)
+            }
+        }
+    }
 
     private fun refreshTokens(): String? {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
@@ -199,12 +251,12 @@ open class MainActivity : AppCompatActivity() {
             val newToken = task.result
             Log.d("newToken", newToken)
             
-            // Обновляем токен в базе данных с использованием lifecycleScope
+            // Обновляем токен в базе данных с использованием lifecycleScope через ViewModel
             myEmail?.let { email ->
                 lifecycleScope.launch {
                     try {
                         showLoading(true)
-                        gameRepository.updateUserToken(email.splitEmail(), newToken)
+                        gameViewModel.updateUserToken(email.splitEmail(), newToken)
                         updateConnectionStatus(getString(R.string.connected))
                     } catch (e: Exception) {
                         Log.e(TAG, "Error updating token: ${e.message}")
@@ -233,170 +285,45 @@ open class MainActivity : AppCompatActivity() {
             com.example.tictacfirebase.R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
         }
         
-        // Делаем ход через repository с использованием lifecycleScope
-        sessionID?.let { sid ->
-            myEmail?.let { email ->
-                lifecycleScope.launch {
-                    try {
-                        showLoading(true)
-                        gameRepository.makeMove(sid, cellID, email)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error making move: ${e.message}")
-                        Toast.makeText(this@MainActivity, "Error making move: ${e.message}", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        showLoading(false)
-                    }
-                }
-            }
-        }
-    }
-
-    // Игровые переменные перенесены в начало класса
-    // Используем gameManager для логики игры
-    
-    /**
-     * Локальная игра (для тестирования или офлайн режима)
-     * В продакшене лучше использовать только сетевую игру через repository
-     */
-    fun PlayGame(cellID: Int, buSelected: Button) {
-        // Используем GameManager для проверки валидности хода
-        if (!gameManager.makeMove(cellID)) {
-            Toast.makeText(this, "Invalid move", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (activePlayer == 1) {
-            buSelected.text = "X"
-            buSelected.setBackgroundResource(R.color.blue)
-            activePlayer = 2
-        } else {
-            buSelected.text = "O"
-            buSelected.setBackgroundResource(R.color.darkgreen)
-            activePlayer = 1
-        }
-
-        buSelected.isEnabled = false
-        
-        // Проверяем победителя через GameManager
-        when (gameManager.checkWinner()) {
-            is WinResult.Player1Wins -> {
-                Toast.makeText(this, "Player 1 wins the game", Toast.LENGTH_LONG).show()
-                restartGame()
-            }
-            is WinResult.Player2Wins -> {
-                Toast.makeText(this, "Player 2 wins the game", Toast.LENGTH_LONG).show()
-                restartGame()
-            }
-            is WinResult.Draw -> {
-                Toast.makeText(this, "Draw!", Toast.LENGTH_LONG).show()
-                restartGame()
-            }
-            else -> {
-                // Игра продолжается
-            }
-        }
-    }
-    
-    /**
-     * Устаревший метод проверки победителя
-     * Используется GameManager вместо ручной проверки
-     */
-    @Deprecated("Use GameManager instead")
-    fun CheckWiner() {
-        // Этот метод больше не используется, логика перенесена в PlayGame
-    }
-
-    fun AutoPlay(cellID: Int) {
-
-
-        val buSelect: Button? = when (cellID) {
-            1 -> bu1
-            2 -> bu2
-            3 -> bu3
-            4 -> bu4
-            5 -> bu5
-            6 -> bu6
-            7 -> bu7
-            8 -> bu8
-            9 -> bu9
-            else -> {
-                bu1
-            }
-        }
-
-        buSelect?.let { PlayGame(cellID, it) }
-
+        // Отправляем событие в ViewModel для обработки хода
+        gameViewModel.onEvent(com.example.tictacfirebase.model.UiEvent.CellSelected(cellID))
     }
 
     fun buRequestEvent(view: View) {
+        val userDemail = etEmail.text.toString()
+        
+        //unHide player2 icon
+        player2_text_View.visibility = View.VISIBLE
+        image_View_user2.visibility = View.VISIBLE
+        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+
+        // Загружаем аватар противника
         lifecycleScope.launch {
-            try {
-                showLoading(true)
-                
-                val userUID = FirebaseAuth.getInstance().uid.toString()
-                val userDemail = etEmail.text.toString()
-
-                //unHide player2 icon
-                player2_text_View.visibility = View.VISIBLE
-                image_View_user2.visibility = View.VISIBLE
-                player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
-
-                // Загружаем аватар противника
-                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                image_View_user2.load(opponentAvatarUrl)
-
-                // Отправляем запрос на игру через repository
-                gameRepository.sendGameRequest(myEmail!!, userDemail)
-                
-                // Создаем сессию игры
-                sessionID = splitEmailFull(myEmail!!) + splitEmailFull(userDemail)
-                gameRepository.createGameSession(sessionID!!)
-                
-                playerSymbol = AppConstants.SYMBOL_X
-                
-                updateConnectionStatus(getString(R.string.waiting_for_opponent))
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending request: ${e.message}")
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                showLoading(false)
-            }
+            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+            image_View_user2.load(opponentAvatarUrl)
         }
+
+        // Отправляем событие в ViewModel
+        gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
     }
 
 
     fun buAcceptEvent(view: View) {
+        val userDemail = etEmail.text.toString()
+        
+        //unHide player2 icon
+        player2_text_View.visibility = View.VISIBLE
+        image_View_user2.visibility = View.VISIBLE
+        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+        
+        // Загружаем аватар противника
         lifecycleScope.launch {
-            try {
-                showLoading(true)
-                
-                val userDemail = etEmail.text.toString()
-                
-                //unHide player2 icon
-                player2_text_View.visibility = View.VISIBLE
-                image_View_user2.visibility = View.VISIBLE
-                player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
-                
-                // Загружаем аватар противника
-                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                image_View_user2.load(opponentAvatarUrl)
-
-                // Создаем сессию игры
-                sessionID = splitEmailFull(userDemail) + splitEmailFull(myEmail!!)
-                gameRepository.createGameSession(sessionID!!)
-                
-                playerSymbol = AppConstants.SYMBOL_O
-                
-                updateConnectionStatus(getString(R.string.your_turn))
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error accepting request: ${e.message}")
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                showLoading(false)
-            }
+            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+            image_View_user2.load(opponentAvatarUrl)
         }
+
+        // Отправляем событие в ViewModel
+        gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
     }
     
     /**
@@ -404,7 +331,7 @@ open class MainActivity : AppCompatActivity() {
      */
     private suspend fun loadOpponentAvatar(email: String): String? {
         return try {
-            gameRepository.getUserProfileImage(email)
+            gameViewModel.getUserProfileImage(email)
         } catch (e: Exception) {
             Log.e(TAG, "Error loading avatar: ${e.message}")
             null
@@ -423,7 +350,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
         fun perfotmFCMSendMessages() {
-        val fromId = FirebaseAuth.getInstance().uid
+//        val fromId = FirebaseAuth.getInstance().uid
 //        val user = intent.getParcelableExtra<User>(NewMessageActivity.USER_KEY)
         val user = myEmail
         val toId = user
@@ -433,7 +360,7 @@ open class MainActivity : AppCompatActivity() {
         val message = RemoteMessage.Builder(SENDER_ID + "@fcm.googleapis.com")
 
                 .setMessageId(Integer.toString(random.nextInt(9999)))
-                .addData("TEST1-- $fromId", "TEST1--  $toId")
+                .addData("TEST1-- $user", "TEST1--  $toId")
 //                    .addData(edt_key1.text.toString(), edt_value1.text.toString())
 //                    .addData(edt_key2.text.toString(), edt_value2.text.toString())
                 .build()

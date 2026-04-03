@@ -5,11 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.example.tictacfirebase.game.GameManager
 import com.example.tictacfirebase.model.GameState
 import com.example.tictacfirebase.model.GameStatus
+import com.example.tictacfirebase.model.UiEffect
 import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 /**
@@ -24,6 +29,10 @@ class GameViewModel(
 
     private val _gameState = MutableStateFlow(GameState())
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
+    
+    // Поток для одноразовых эффектов (toast, навигация)
+    private val _uiEffect = MutableSharedFlow<UiEffect>()
+    val uiEffect: SharedFlow<UiEffect> = _uiEffect.asSharedFlow()
 
     private val gameManager = GameManager()
 
@@ -49,38 +58,84 @@ class GameViewModel(
                 }
         }
     }
+    
+    /**
+     * Публичный метод для обновления статуса сети из Activity
+     * Вызывается когда MainActivity наблюдает за сетью и показывает оверлей
+     */
+    fun observeNetworkStatusForUi(isOnline: Boolean) {
+        viewModelScope.launch {
+            updateState { copy(isOnline = isOnline) }
+        }
+    }
+
+    /**
+     * Наблюдение за входящими запросами на игру
+     */
+    fun observeGameRequests(userEmail: String): Flow<String> {
+        return gameRepository.observeGameRequests(userEmail)
+    }
+
+    /**
+     * Очистка запроса на игру после обработки
+     */
+    suspend fun clearGameRequest(userEmail: String) {
+        gameRepository.clearGameRequest(userEmail)
+    }
+
+    /**
+     * Обновление токена пользователя
+     */
+    suspend fun updateUserToken(userEmail: String, token: String) {
+        gameRepository.updateUserToken(userEmail, token)
+    }
+
+    /**
+     * Получение аватара пользователя
+     */
+    suspend fun getUserProfileImage(email: String): String? {
+        return gameRepository.getUserProfileImage(email).getOrNull()
+    }
 
     private fun loadInitialData() {
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
-            try {
-                // Загружаем имена и аватарки
-                val playerNames = gameRepository.getPlayerNames(gameId)
-                val myName = playerNames.first
-                val opponentName = playerNames.second
-                
-                // Загружаем аватарки (асинхронно, не блокируя основной поток)
-                val myAvatar = gameRepository.getUserProfileImage(myName)
-                val opponentAvatar = gameRepository.getUserProfileImage(opponentName)
+            // Загружаем имена и аватарки
+            val playerNamesResult = gameRepository.getPlayerNames(gameId)
+            
+            playerNamesResult.fold(
+                onSuccess = { playerNames ->
+                    val myName = playerNames.first
+                    val opponentName = playerNames.second
+                    
+                    // Загружаем аватарки (асинхронно, не блокируя основной поток)
+                    val myAvatarResult = gameRepository.getUserProfileImage(myName)
+                    val opponentAvatarResult = gameRepository.getUserProfileImage(opponentName)
+                    
+                    val myAvatar = myAvatarResult.getOrNull()
+                    val opponentAvatar = opponentAvatarResult.getOrNull()
 
-                updateState {
-                    copy(
-                        currentPlayerName = myName,
-                        opponentName = opponentName,
-                        playerAvatarUrl = myAvatar,
-                        opponentAvatarUrl = opponentAvatar,
-                        isLoading = false,
-                        sessionId = gameId
-                    )
+                    updateState {
+                        copy(
+                            currentPlayerName = myName,
+                            opponentName = opponentName,
+                            playerAvatarUrl = myAvatar,
+                            opponentAvatarUrl = opponentAvatar,
+                            isLoading = false,
+                            sessionId = gameId
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    updateState { 
+                        copy(
+                            isLoading = false,
+                            errorMessage = "Ошибка загрузки данных: ${error.message}"
+                        )
+                    }
+                    sendEffect(UiEffect.ShowToast("Ошибка: ${error.message}"))
                 }
-            } catch (e: Exception) {
-                updateState { 
-                    copy(
-                        isLoading = false,
-                        errorMessage = "Ошибка загрузки данных: ${e.message}"
-                    )
-                }
-            }
+            )
         }
     }
 
@@ -129,6 +184,7 @@ class GameViewModel(
     fun onEvent(event: UiEvent) {
         when (event) {
             is UiEvent.CellClicked -> handleCellClick()
+            is UiEvent.CellSelected -> makeMove(event.cellIndex)
             is UiEvent.RestartGameClicked -> restartGame()
             else -> { /* Другие события обрабатываются в MainActivity */ }
         }
@@ -140,13 +196,12 @@ class GameViewModel(
             
             // Блокируем клики если нет интернета
             if (!currentState.isOnline) {
-                updateState { 
-                    copy(errorMessage = "Нет подключения к интернету") 
-                }
+                sendEffect(UiEffect.ShowToast("Нет подключения к интернету"))
                 return@launch
             }
             
             if (!currentState.isMyTurn || currentState.gameStatus != GameStatus.Playing) {
+                sendEffect(UiEffect.ShowToast("Не ваш ход!"))
                 return@launch
             }
 
@@ -161,60 +216,73 @@ class GameViewModel(
             
             // Блокируем ходы если нет интернета
             if (!currentState.isOnline) {
-                updateState { 
-                    copy(errorMessage = "Нет подключения к интернету") 
-                }
+                sendEffect(UiEffect.ShowToast("Нет подключения к интернету"))
                 return@launch
             }
             
             if (!currentState.isMyTurn || currentState.gameStatus != GameStatus.Playing) {
+                sendEffect(UiEffect.ShowToast("Не ваш ход!"))
                 return@launch
             }
 
-            try {
-                val board = currentState.boardState.toMutableList()
-                if (board[cellIndex].isNotEmpty()) {
-                    return@launch // Клетка занята
-                }
-
-                // Определяем мой символ
-                val mySymbol = if (currentState.currentPlayerName == 
-                    gameRepository.getFirstPlayer(gameId)) "X" else "O"
-
-                board[cellIndex] = mySymbol
-                
-                // Отправляем ход на сервер
-                gameRepository.updateBoardState(gameId, board)
-                
-            } catch (e: Exception) {
-                updateState {
-                    copy(errorMessage = "Ошибка хода: ${e.message}")
-                }
+            val board = currentState.boardState.toMutableList()
+            if (board[cellIndex].isNotEmpty()) {
+                sendEffect(UiEffect.ShowToast("Клетка занята"))
+                return@launch // Клетка занята
             }
+
+            // Определяем мой символ
+            val mySymbolResult = gameRepository.getFirstPlayer(gameId)
+            val mySymbol = if (currentState.currentPlayerName == mySymbolResult.getOrNull()) "X" else "O"
+
+            board[cellIndex] = mySymbol
+            
+            // Отправляем ход на сервер
+            val updateResult = gameRepository.updateBoardState(gameId, board)
+            
+            updateResult.fold(
+                onSuccess = {
+                    // Ход успешно отправлен
+                },
+                onFailure = { error ->
+                    sendEffect(UiEffect.ShowToast("Ошибка хода: ${error.message}"))
+                }
+            )
         }
     }
 
     private fun restartGame() {
         viewModelScope.launch {
-            try {
-                gameRepository.restartGame(gameId)
-                updateState {
-                    copy(
-                        boardState = List(9) { "" },
-                        gameStatus = GameStatus.Playing,
-                        isMyTurn = gameRepository.getCurrentTurn(gameId) == currentPlayerName
-                    )
+            val currentTurnResult = gameRepository.getCurrentTurn(gameId)
+            val restartResult = gameRepository.restartGame(gameId)
+            
+            restartResult.fold(
+                onSuccess = {
+                    updateState {
+                        copy(
+                            boardState = List(9) { "" },
+                            gameStatus = GameStatus.Playing,
+                            isMyTurn = currentTurnResult.getOrNull() == currentPlayerName
+                        )
+                    }
+                    sendEffect(UiEffect.ShowToast("Игра перезапущена"))
+                },
+                onFailure = { error ->
+                    sendEffect(UiEffect.ShowToast("Ошибка перезапуска: ${error.message}"))
                 }
-            } catch (e: Exception) {
-                updateState {
-                    copy(errorMessage = "Ошибка перезапуска: ${e.message}")
-                }
-            }
+            )
         }
     }
 
     private suspend fun updateState(update: GameState.() -> GameState) {
         _gameState.emit(_gameState.value.update())
+    }
+    
+    /**
+     * Отправка UI эффекта (toast, навигация и т.д.)
+     */
+    private suspend fun sendEffect(effect: UiEffect) {
+        _uiEffect.emit(effect)
     }
 
     // Экспортируем имя текущего игрока для внешнего использования
