@@ -15,11 +15,9 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.iid.FirebaseInstanceId
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.squareup.picasso.Picasso
-import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -33,7 +31,6 @@ open class MainActivity : AppCompatActivity() {
         val TAG = "MainActivity"
     }
 
-    //    private val s = "793202519353"
     private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
@@ -42,7 +39,6 @@ open class MainActivity : AppCompatActivity() {
     private var myRef = database.reference
 
     var myEmail: String? = null
-
 
     lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
@@ -59,11 +55,6 @@ open class MainActivity : AppCompatActivity() {
 
         refreshTokens()
 
-//        var tokenID = MyFirebaseMessagingService()
-//        val newToken = tokenID.otherStyleGetToken().toString()
-//        Log.d(TAG, "getTokenID: $newToken")
-
-
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
         val channelId = getString(R.string.default_notification_channel_id)
@@ -75,14 +66,15 @@ open class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshTokens(): String? {
-        val newToken = FirebaseInstanceId.getInstance().token
-        Log.d("newToken", (newToken))
-//        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
-        return newToken
-
-//        if (newToken != null) {
-//            MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
-//        }
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                return@addOnCompleteListener
+            }
+            val newToken = task.result
+            Log.d("newToken", newToken)
+        }
+        return null
     }
 
     fun buClick(view: View) {
@@ -103,7 +95,6 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "ID:" + cellID, Toast.LENGTH_LONG).show()
 
         sessionID?.let { myRef.child("PlayerOnline").child(it).child(cellID.toString()).setValue(myEmail) }
-//        myRef.child("PlayerOnline").child(sessionID!!).child(cellID.toString()).setValue(myEmail)
     }
 
     var player1 = ArrayList<Int>()
@@ -240,8 +231,6 @@ open class MainActivity : AppCompatActivity() {
         buSelect?.let { PlayGame(cellID, it) }
 
     }
-//    lateinit var ImageProfile = getImageProfile().toString()
-
 
     fun buRequestEvent(view: View) {
         GlobalScope.launch(Dispatchers.Main) {
