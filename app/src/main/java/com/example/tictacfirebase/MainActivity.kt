@@ -17,6 +17,7 @@ import com.example.tictacfirebase.models.User
 import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.example.tictacfirebase.utils.AppConstants
+import com.example.tictacfirebase.utils.NetworkMonitor
 import com.example.tictacfirebase.utils.splitEmail
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
@@ -71,6 +72,9 @@ open class MainActivity : AppCompatActivity() {
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
     private lateinit var noInternetOverlay: android.widget.FrameLayout
+    
+    // GameViewModel для управления состоянием игры и сетью
+    private lateinit var gameViewModel: GameViewModel
     
     // Игровые переменные
     private var sessionID: String? = null
@@ -127,6 +131,15 @@ open class MainActivity : AppCompatActivity() {
         
         // Обновляем статус подключения
         updateConnectionStatus(getString(R.string.connecting))
+        
+        // Инициализация GameViewModel с временным gameId (будет обновлен при создании/присоединении к игре)
+        gameViewModel = ViewModelProvider(
+            this,
+            GameViewModelFactory(gameRepository, "temp_game_id", this)
+        )[GameViewModel::class.java]
+        
+        // Наблюдаем за состоянием сети через ViewModel и показываем/скрываем оверлей
+        setupNetworkObserver()
         
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
@@ -188,6 +201,32 @@ open class MainActivity : AppCompatActivity() {
         burequest.isEnabled = !show
         buAcceptEvent.isEnabled = !show && buAcceptEvent.tag == "enabled"
         etEmail.isEnabled = !show
+    }
+    
+    /**
+     * Настройка наблюдения за состоянием сети через GameViewModel
+     * Показывает/скрывает оверлей при потере/восстановлении подключения
+     */
+    private fun setupNetworkObserver() {
+        lifecycleScope.launch {
+            NetworkMonitor.observeNetworkConnectivity(this@MainActivity).collect { isOnline ->
+                Log.d(TAG, "Network status changed: isOnline=$isOnline")
+                
+                // Обновляем текст статуса подключения
+                val statusText = if (isOnline) {
+                    getString(R.string.connected)
+                } else {
+                    getString(R.string.no_internet)
+                }
+                updateConnectionStatus(statusText)
+                
+                // Показываем/скрываем оверлей
+                showNoInternetOverlay(!isOnline)
+                
+                // Также обновляем состояние в ViewModel
+                gameViewModel.observeNetworkStatusForUi(isOnline)
+            }
+        }
     }
 
     private fun refreshTokens(): String? {

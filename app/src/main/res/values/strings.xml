@@ -12,6 +12,7 @@
     <!-- UI Status Strings -->
     <string name="connecting">Connecting to Firebase…</string>
     <string name="connected">Connected</string>
+    <string name="no_internet">No internet connection</string>
     <string name="waiting_for_opponent">Waiting for opponent…</string>
     <string name="your_turn">Your turn</string>
     <string name="opponent_turn">Opponent\'s turn</string>
