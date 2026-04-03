@@ -23,26 +23,26 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     val TAG = "FCM_Service"
 
 
-    override fun onMessageReceived(remoteMessage: RemoteMessage?) {
-        Log.d(TAG, "From: " + remoteMessage!!.from)
-        Log.d(TAG, "Notification Message Body: " + remoteMessage.notification!!.body!!)
+    override fun onMessageReceived(remoteMessage: RemoteMessage) {
+        Log.d(TAG, "From: " + remoteMessage.from)
+        Log.d(TAG, "Notification Message Body: " + remoteMessage.notification?.body)
         
-        remoteMessage.data?.isNotEmpty()?.let {
+        if (remoteMessage.data.isNotEmpty()) {
             Log.d(TAG, "Message data payload: " + remoteMessage.data)
         }
         sendNotification(remoteMessage)
     }
 
 
-    override fun onNewToken(s: String?) {
-        super.onNewToken(s)
-        val deviceToken = s
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        val deviceToken = token
         Log.d("NEW_TOKEN", deviceToken)
 
-        if (s != null) {
-            Log.d(TAG, "TOKEN_$s")
-            Toast.makeText(this, "New Token: ${s}", Toast.LENGTH_SHORT).show()
-            saveTokenToFirebaseDatabase(s)
+        if (token.isNotEmpty()) {
+            Log.d(TAG, "TOKEN_$token")
+            Toast.makeText(this, "New Token: ${token}", Toast.LENGTH_SHORT).show()
+            saveTokenToFirebaseDatabase(token)
         }
     }
 
@@ -97,15 +97,5 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
         notificationManager.notify(0, notificationBuilder.build())
-    }
-
-
-    override fun onMessageSent(msgId: String?) {
-        Log.e(TAG, "onMessageSent: " + msgId!!)
-    }
-
-    override fun onSendError(msgId: String?, e: Exception?) {
-        Log.e(TAG, "onSendError: " + msgId!!)
-        Log.e(TAG, "Exception: " + e!!)
     }
 }
