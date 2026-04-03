@@ -1,0 +1,28 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "users": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "$userId === auth.uid || root.child('users').child($userId).child('email').val() === auth.token.email",
+        "request": {
+          ".read": "$userId === auth.uid.replace(/@/g, '').split('.')[0] || root.child('users').child($userId).child('email').val() === auth.token.email",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "PlayerOnline": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$sessionId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "latest-messages": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
