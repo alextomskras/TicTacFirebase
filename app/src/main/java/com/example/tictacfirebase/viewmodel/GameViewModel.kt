@@ -49,6 +49,16 @@ class GameViewModel(
                 }
         }
     }
+    
+    /**
+     * Публичный метод для обновления статуса сети из Activity
+     * Вызывается когда MainActivity наблюдает за сетью и показывает оверлей
+     */
+    fun observeNetworkStatusForUi(isOnline: Boolean) {
+        viewModelScope.launch {
+            updateState { copy(isOnline = isOnline) }
+        }
+    }
 
     private fun loadInitialData() {
         viewModelScope.launch {
