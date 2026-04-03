@@ -7,8 +7,14 @@ import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.example.tictacfirebase.game.GameManager
+import com.example.tictacfirebase.game.WinResult
 import com.example.tictacfirebase.models.User
+import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
+import com.example.tictacfirebase.utils.AppConstants
+import com.example.tictacfirebase.utils.splitEmail
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -18,23 +24,27 @@ import com.google.firebase.database.ValueEventListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.squareup.picasso.Picasso
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.*
-import kotlin.collections.ArrayList
-
 
 open class MainActivity : AppCompatActivity() {
 
     companion object {
-        val TAG = "MainActivity"
+        val TAG = AppConstants.TAG
     }
 
     private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
-    //database instance
+    // Repository для работы с Firebase
+    private lateinit var gameRepository: GameRepository
+    
+    // Менеджер игры для локальной логики
+    private lateinit var gameManager: GameManager
+
+    // Database instance (оставляем для обратной совместимости, но постепенно убираем)
     private var database = FirebaseDatabase.getInstance()
     private var myRef = database.reference
 
@@ -42,10 +52,31 @@ open class MainActivity : AppCompatActivity() {
 
     lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
+    
+    // Переменные для управления подписками
+    private var gameSessionListener: ValueEventListener? = null
+    private var incomingRequestsListener: ValueEventListener? = null
+    private var userProfileListener: ValueEventListener? = null
+    
+    // Coroutine jobs для отмены в onDestroy
+    private var gameSessionJob: Job? = null
+    private var incomingRequestsJob: Job? = null
+
+    // Игровые переменные
+    private var sessionID: String? = null
+    private var playerSymbol: String? = null
+    private var activePlayer = 1
+    private var player1 = ArrayList<Int>()
+    private var player2 = ArrayList<Int>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        
+        // Инициализация repository и game manager
+        gameRepository = GameRepository()
+        gameManager = GameManager()
+        
         //Hide img+player2name
         player2_text_View!!.visibility = View.GONE
         image_View_user2!!.visibility = View.GONE
@@ -59,10 +90,33 @@ open class MainActivity : AppCompatActivity() {
 
         val channelId = getString(R.string.default_notification_channel_id)
         val b: Bundle = intent.extras
-        myEmail = b.getString("email")
+        myEmail = b.getString(AppConstants.KEY_EMAIL)
         Log.d(TAG, "getExtraEmail: $myEmail")
         supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
-        IncommingCalls()
+        
+        // Запускаем прослушивание входящих запросов с использованием lifecycleScope
+        setupIncomingRequestsListener()
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Отменяем все корутины
+        gameSessionJob?.cancel()
+        incomingRequestsJob?.cancel()
+        
+        // Удаляем слушатели Firebase
+        sessionID?.let {
+            if (gameSessionListener != null) {
+                myRef.child("PlayerOnline").child(it).removeEventListener(gameSessionListener!!)
+            }
+        }
+        
+        myEmail?.let { email ->
+            if (incomingRequestsListener != null) {
+                myRef.child("users").child(email.splitEmail()).child("request")
+                    .removeEventListener(incomingRequestsListener!!)
+            }
+        }
     }
 
     private fun refreshTokens(): String? {
@@ -73,6 +127,17 @@ open class MainActivity : AppCompatActivity() {
             }
             val newToken = task.result
             Log.d("newToken", newToken)
+            
+            // Обновляем токен в базе данных с использованием lifecycleScope
+            myEmail?.let { email ->
+                lifecycleScope.launch {
+                    try {
+                        gameRepository.updateUserToken(email.splitEmail(), newToken)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error updating token: ${e.message}")
+                    }
+                }
+            }
         }
         return null
     }
@@ -81,133 +146,86 @@ open class MainActivity : AppCompatActivity() {
         val buSelected = view as Button
         var cellID = 0
         when (buSelected.id) {
-            com.example.tictacfirebase.R.id.bu1 -> cellID = 1
-            com.example.tictacfirebase.R.id.bu2 -> cellID = 2
-            com.example.tictacfirebase.R.id.bu3 -> cellID = 3
-            com.example.tictacfirebase.R.id.bu4 -> cellID = 4
-            com.example.tictacfirebase.R.id.bu5 -> cellID = 5
-            com.example.tictacfirebase.R.id.bu6 -> cellID = 6
-            com.example.tictacfirebase.R.id.bu7 -> cellID = 7
-            com.example.tictacfirebase.R.id.bu8 -> cellID = 8
-            com.example.tictacfirebase.R.id.bu9 -> cellID = 9
-
+            com.example.tictacfirebase.R.id.bu1 -> cellID = AppConstants.CellIds.CELL_1
+            com.example.tictacfirebase.R.id.bu2 -> cellID = AppConstants.CellIds.CELL_2
+            com.example.tictacfirebase.R.id.bu3 -> cellID = AppConstants.CellIds.CELL_3
+            com.example.tictacfirebase.R.id.bu4 -> cellID = AppConstants.CellIds.CELL_4
+            com.example.tictacfirebase.R.id.bu5 -> cellID = AppConstants.CellIds.CELL_5
+            com.example.tictacfirebase.R.id.bu6 -> cellID = AppConstants.CellIds.CELL_6
+            com.example.tictacfirebase.R.id.bu7 -> cellID = AppConstants.CellIds.CELL_7
+            com.example.tictacfirebase.R.id.bu8 -> cellID = AppConstants.CellIds.CELL_8
+            com.example.tictacfirebase.R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
         }
         Toast.makeText(this, "ID:" + cellID, Toast.LENGTH_LONG).show()
 
-        sessionID?.let { myRef.child("PlayerOnline").child(it).child(cellID.toString()).setValue(myEmail) }
+        // Делаем ход через repository с использованием lifecycleScope
+        sessionID?.let { sid ->
+            myEmail?.let { email ->
+                lifecycleScope.launch {
+                    try {
+                        gameRepository.makeMove(sid, cellID, email)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error making move: ${e.message}")
+                        Toast.makeText(this@MainActivity, "Error making move: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
     }
 
-    var player1 = ArrayList<Int>()
-    var player2 = ArrayList<Int>()
-    var ActivePlayer = 1
-
-
+    // Игровые переменные перенесены в начало класса
+    // Используем gameManager для логики игры
+    
+    /**
+     * Локальная игра (для тестирования или офлайн режима)
+     * В продакшене лучше использовать только сетевую игру через repository
+     */
     fun PlayGame(cellID: Int, buSelected: Button) {
+        // Используем GameManager для проверки валидности хода
+        if (!gameManager.makeMove(cellID)) {
+            Toast.makeText(this, "Invalid move", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        if (ActivePlayer == 1) {
+        if (activePlayer == 1) {
             buSelected.text = "X"
             buSelected.setBackgroundResource(R.color.blue)
-            player1.add(cellID)
-            ActivePlayer = 2
-
+            activePlayer = 2
         } else {
             buSelected.text = "O"
             buSelected.setBackgroundResource(R.color.darkgreen)
-            player2.add(cellID)
-            ActivePlayer = 1
+            activePlayer = 1
         }
-
 
         buSelected.isEnabled = false
-        CheckWiner()
-    }
-
-
-    fun CheckWiner() {
-        var winer = -1
-
-        // row 1
-        if (player1.contains(1) && player1.contains(2) && player1.contains(3)) {
-            winer = 1
-        }
-        if (player2.contains(1) && player2.contains(2) && player2.contains(3)) {
-            winer = 2
-        }
-
-
-        // row 2
-        if (player1.contains(4) && player1.contains(5) && player1.contains(6)) {
-            winer = 1
-        }
-        if (player2.contains(4) && player2.contains(5) && player2.contains(6)) {
-            winer = 2
-        }
-
-
-        // row 3
-        if (player1.contains(7) && player1.contains(8) && player1.contains(9)) {
-            winer = 1
-        }
-        if (player2.contains(7) && player2.contains(8) && player2.contains(9)) {
-            winer = 2
-        }
-
-
-        // col 1
-        if (player1.contains(1) && player1.contains(4) && player1.contains(7)) {
-            winer = 1
-        }
-        if (player2.contains(1) && player2.contains(4) && player2.contains(7)) {
-            winer = 2
-        }
-
-
-        // col 2
-        if (player1.contains(2) && player1.contains(5) && player1.contains(8)) {
-            winer = 1
-        }
-        if (player2.contains(2) && player2.contains(5) && player2.contains(8)) {
-            winer = 2
-        }
-
-
-        // col 3
-        if (player1.contains(3) && player1.contains(6) && player1.contains(9)) {
-            winer = 1
-        }
-        if (player2.contains(3) && player2.contains(6) && player2.contains(9)) {
-            winer = 2
-        }
-
-        // cros 1
-        if (player1.contains(1) && player1.contains(5) && player1.contains(9)) {
-            winer = 1
-        }
-        if (player2.contains(1) && player2.contains(5) && player2.contains(9)) {
-            winer = 2
-        }
-
-        // cros 2
-        if (player1.contains(3) && player1.contains(5) && player1.contains(7)) {
-            winer = 1
-        }
-        if (player2.contains(3) && player2.contains(5) && player2.contains(7)) {
-            winer = 2
-        }
-
-
-        if (winer != -1) {
-
-            if (winer == 1) {
-                android.widget.Toast.makeText(this, " Player 1  win the game", android.widget.Toast.LENGTH_LONG).show()
-                restartGame()
-            } else {
-                android.widget.Toast.makeText(this, " Player 2  win the game", android.widget.Toast.LENGTH_LONG).show()
+        
+        // Проверяем победителя через GameManager
+        when (gameManager.checkWinner()) {
+            is WinResult.Player1Wins -> {
+                Toast.makeText(this, "Player 1 wins the game", Toast.LENGTH_LONG).show()
                 restartGame()
             }
-
+            is WinResult.Player2Wins -> {
+                Toast.makeText(this, "Player 2 wins the game", Toast.LENGTH_LONG).show()
+                restartGame()
+            }
+            is WinResult.Draw -> {
+                Toast.makeText(this, "Draw!", Toast.LENGTH_LONG).show()
+                restartGame()
+            }
+            else -> {
+                // Игра продолжается
+            }
         }
-
+    }
+    
+    /**
+     * Устаревший метод проверки победителя
+     * Используется GameManager вместо ручной проверки
+     */
+    @Deprecated("Use GameManager instead")
+    fun CheckWiner() {
+        // Этот метод больше не используется, логика перенесена в PlayGame
     }
 
     fun AutoPlay(cellID: Int) {
@@ -286,276 +304,22 @@ open class MainActivity : AppCompatActivity() {
     var sessionID: String? = null
     var PlayerSymbol: String? = null
 
-    fun PlayerOnline(sessionID: String) {
-        this.sessionID = sessionID
-        Log.d(TAG, "PlayerOn0: $sessionID")
-
-        getPlayerOnline(sessionID) {
-            var trace1 = it
-            Log.d(TAG, "PlayerOngetPlayerOnline: $it")
-        }
-        myRef.child("PlayerOnline").removeValue()
-        myRef.child("PlayerOnline").child(sessionID)
-//        myRef.child("PlayerOnline")
-                .addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(dataSnapshot: DataSnapshot) {
-
-                        try {
-                            player1.clear()
-                            player2.clear()
-                            val KeyName = dataSnapshot.value.toString()
-                            Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
-                            var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
-                            Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
 
 
-//
-//                      val td=dataSnapshot!!.value as HashMap<String,Any>
-                            val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
-//
-                            Log.d(TAG, "PlayerOn1: $td")
-//
-//                        if (td != null) {
-//
-//                            var value: String?
-//                            for (key in td.keys) {
-//                                value = td[key] as String
-//                                Log.d(TAG, "PlayerHash: $value")
-//
-//                                if (value != myEmail) {
-//                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
-//                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
-//                                } else {
-//                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
-//                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
-//                                }
-//                                Log.d(TAG, "PlayerKey: $key")
-//
-//                                AutoPlay(key.toString().toInt())
-//
-//
-//                            }
-//
-//                        }
-
-                        } catch (ex: Exception) {
-                            println("Somthing wrongex" + ex)
-                            Toast.makeText(applicationContext, " Somthing wrongex+$ex", Toast.LENGTH_LONG).show()
-                        }
-                    }
-
-                    override fun onCancelled(p0: DatabaseError) {
-
-                    }
-
-                })
 
 
+
+
+
+    /**
+     * Завершение игры и перезапуск
+     */
+    private fun endGame(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        restartGame()
     }
 
-    //    function: (String) -> Unit): String
-    fun getPlayerOnline(sessionID: String, function: (String) -> Unit) {
-        this.sessionID = sessionID
-        myRef.child("PlayerOnline").removeValue()
-        myRef.child("PlayerOnline").child(sessionID)
-//        myRef.child("PlayerOnline")
-                .addValueEventListener(object : ValueEventListener {
-                    override fun onDataChange(dataSnapshot: DataSnapshot) {
-                        try {
-                            player1.clear()
-                            player2.clear()
-                            val children = dataSnapshot.children
-                            children.forEach {
-                                println(it.toString())
-                                Log.d(TAG, "KeyName_PlayerOn4!!!!: " + it.toString())
-                                if (it != null) {
-                                    Log.d(TAG, "KeyName_PlayerOn5!!!!: " + it.key.toString())
-                                    Log.d(TAG, "KeyName_PlayerOn6!!!!: " + it.value.toString())
-                                    if (it.value.toString() != myEmail) {
-                                        ActivePlayer = if (PlayerSymbol === "X") 1 else 2
-                                        Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
-                                    } else {
-                                        ActivePlayer = if (PlayerSymbol === "X") 2 else 1
-                                        Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
-                                    }
-                                    Log.d(TAG, "PlayerKey: " + it.key.toString())
-
-                                    AutoPlay(it.key!!.toInt())
-
-                                }
-                            }
-
-//                        val KeyName = dataSnapshot.key.toString()
-//                        Log.d(TAG, "KeyName_PlayerOn3!!!!: $KeyName")
-//                        var PlayerOnlineProfile = dataSnapshot.value.toString().trim()
-//                        Log.d(TAG, "PlayerOn3!!!!: $PlayerOnlineProfile")
-////
-////
-//                        val td = (if (dataSnapshot != null) dataSnapshot.value else null) as? HashMap<*, *>
-//
-////                            Log.d(TAG, "PlayerOn1: $td")
-////                            function(KeyName)
-////                            Log.d(TAG, "PlayerOn1: $KeyName")
-//
-//                        if (td != null) {
-//
-//                            var value: String?
-//                            for (key in td.keys) {
-//                                value = td[key] as String
-//                                Log.d(TAG, "PlayerHash: $value")
-//
-//                                if (value != myEmail) {
-//                                    ActivePlayer = if (PlayerSymbol === "X") 1 else 2
-//                                    Log.d(TAG, "PlayerSymbolValue: $ActivePlayer")
-//                                } else {
-//                                    ActivePlayer = if (PlayerSymbol === "X") 2 else 1
-//                                    Log.d(TAG, "PlayerSymbolElseValue: $ActivePlayer")
-//                                }
-//                                Log.d(TAG, "PlayerKey: $key")
-//
-//                                AutoPlay(key.toString().toInt())
-//
-//
-//                            }
-//
-//                        }
-
-                        } catch (ex: Exception) {
-                            println("getPlayerOnline error " + ex)
-                            Toast.makeText(applicationContext, " getPlayerOnline error $ex", Toast.LENGTH_LONG).show()
-                        }
-                    }
-
-                    override fun onCancelled(p0: DatabaseError) {
-                        println(p0.message.toString())
-
-                    }
-
-
-                })
-
-
-    }
-
-
-    var number = 0
-
-    fun IncommingCalls() {
-        GlobalScope.launch(Dispatchers.Main) {
-            myRef.child("latest-messages").removeValue()
-            myRef.child("users").child(SplitString(myEmail!!)).child("request")
-
-
-                    .addValueEventListener(object : ValueEventListener {
-
-
-                        override fun onDataChange(p0: DataSnapshot) {
-
-
-                            try {
-                                val td: HashMap<String, Any>
-                                td = p0.value as HashMap<String, Any>
-                                if (td != null) {
-
-                                    var value: String
-                                    for (key in td.keys) {
-                                        value = td[key] as String
-                                        Log.d(TAG, "Incomming: $value")
-                                        etEmail.setText(value)
-///                                val notifyme = Notifications()
-//                                val notifyme = MyFirebaseMessagingService()
-///                                notifyme.Notify(applicationContext, value + " want to play tic tac toy", number)
-//                                notifyme.sendNotification(RemoteMessage())
-                                        perfotmFCMSendMessages()
-                                        //Release_ACCEPT_BUTTON
-                                        buAcceptEvent.isEnabled = true
-                                        number++
-                                        Log.d(TAG, "Incomming_myEmail: $myEmail")
-                                        Toast.makeText(applicationContext, "Incomming_myEmail: $myEmail", Toast.LENGTH_LONG).show()
-                                        myRef.child("users").child(SplitString(myEmail!!)).child("request")
-                                                .setValue(true)
-
-                                        break
-
-                                    }
-
-                                }
-
-                            } catch (ex: Exception) {
-                                println("Somthing EXwr!!!!!_: " + ex)
-                                Toast.makeText(applicationContext, "Somthing EXwr!!!!!_: $ex", Toast.LENGTH_LONG).show()
-                            }
-                        }
-
-                        override fun onCancelled(p0: DatabaseError) {
-
-                        }
-
-
-                    })
-
-        }
-    }
-
-    //    fun readData(myCallback: (List<String>) -> Unit)
-    fun getImageProfile(function: (String) -> Unit): String {
-        var test1 = ""
-        GlobalScope.launch(Dispatchers.Main) {
-
-
-            var imgProfile = ""
-            var userDemail = etEmail.text.toString()
-            var splituserDemail = SplitString(userDemail)
-            Log.e(TAG, "UpstreamSplituserDemail: " + splituserDemail)
-
-            val ref = FirebaseDatabase.getInstance().getReference("/users/$splituserDemail")
-
-            //        databaseReference = FirebaseDatabase.getInstance().reference.child("Users").child(user_id)
-
-            ref.addValueEventListener(object : ValueEventListener {
-
-                override fun onDataChange(dataSnapshot: DataSnapshot) {
-                    try {
-                        val UserName = dataSnapshot.child("name").value as String?
-                        //                val ImageProfile = dataSnapshot.child("profileImageUrl").value as String?
-                        var ImageProfile = dataSnapshot.getValue(User::class.java)
-                        var test1 = ImageProfile!!.profileImageUrl
-
-
-
-                        Log.e(TAG, "UpstreamImageProfile: " + imgProfile)
-                        Log.e(TAG, "Upstream-test1: " + test1)
-                        function(test1)
-
-
-                    } catch (ex: Exception) {
-                        println("Somthing EXwr" + ex)
-                        Toast.makeText(applicationContext, " Somthing EXwr+$ex", Toast.LENGTH_LONG).show()
-                    }
-                    //
-
-
-                }
-
-                override fun onCancelled(databaseError: DatabaseError) {
-
-                }
-
-            })
-            Log.e(TAG, "Upstream-Return-test1: " + test1)
-
-
-        }
-        return test1
-    }
-
-
-    fun SplitString(str: String): String {
-        var split = str.split("@")
-        return split[0]
-    }
-
-    fun perfotmFCMSendMessages() {
+        fun perfotmFCMSendMessages() {
         val fromId = FirebaseAuth.getInstance().uid
 //        val user = intent.getParcelableExtra<User>(NewMessageActivity.USER_KEY)
         val user = myEmail
