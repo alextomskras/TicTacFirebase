@@ -39,4 +39,16 @@ sealed class UiEvent {
     object JoinGameClicked : UiEvent()
     object RestartGameClicked : UiEvent()
     data class JoinWithCode(val code: String) : UiEvent()
+    data class CellSelected(val cellIndex: Int) : UiEvent()
+}
+
+/**
+ * Одноразовые UI эффекты (toast, навигация, диалоги)
+ */
+sealed class UiEffect {
+    data class ShowToast(val message: String) : UiEffect()
+    data class NavigateTo(val destination: String) : UiEffect()
+    object GameEnded : UiEffect()
+    object ShowLoading : UiEffect()
+    object HideLoading : UiEffect()
 }

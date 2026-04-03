@@ -143,8 +143,34 @@ open class MainActivity : AppCompatActivity() {
         // Наблюдаем за состоянием сети через ViewModel и показываем/скрываем оверлей
         setupNetworkObserver()
         
+        // Наблюдаем за UI эффектами от ViewModel (toast, навигация)
+        setupUiEffectObserver()
+        
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
+    }
+    
+    /**
+     * Настройка наблюдения за UI эффектами от ViewModel
+     * Показывает toast сообщения и обрабатывает навигацию
+     */
+    private fun setupUiEffectObserver() {
+        lifecycleScope.launch {
+            gameViewModel.uiEffect.collect { effect ->
+                when (effect) {
+                    is com.example.tictacfirebase.model.UiEffect.ShowToast -> {
+                        Toast.makeText(this@MainActivity, effect.message, Toast.LENGTH_SHORT).show()
+                    }
+                    is com.example.tictacfirebase.model.UiEffect.NavigateTo -> {
+                        // TODO: Реализовать навигацию
+                    }
+                    com.example.tictacfirebase.model.UiEffect.GameEnded -> {
+                        // TODO: Показать диалог конца игры
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
     
     /**
@@ -336,22 +362,8 @@ open class MainActivity : AppCompatActivity() {
             com.example.tictacfirebase.R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
         }
         
-        // Делаем ход через repository с использованием lifecycleScope
-        sessionID?.let { sid ->
-            myEmail?.let { email ->
-                lifecycleScope.launch {
-                    try {
-                        showLoading(true)
-                        gameRepository.makeMove(sid, cellID, email)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error making move: ${e.message}")
-                        Toast.makeText(this@MainActivity, "Error making move: ${e.message}", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        showLoading(false)
-                    }
-                }
-            }
-        }
+        // Отправляем событие в ViewModel для обработки хода
+        gameViewModel.onEvent(com.example.tictacfirebase.model.UiEvent.CellSelected(cellID))
     }
 
     // Игровые переменные перенесены в начало класса
