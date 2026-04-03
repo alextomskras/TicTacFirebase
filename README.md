@@ -11,28 +11,42 @@ Android-приложение игры "Крестики-нолики" с онл�
 
 ## 🔧 Технологии
 
-- **Язык**: Kotlin
+- **Язык**: Kotlin 1.9.0
 - **Минимальная версия Android**: API 21 (Android 5.0 Lollipop)
-- **Целевая версия Android**: API 28 (Android 9.0 Pie)
+- **Целевая версия Android**: API 34 (Android 14)
+- **Compile SDK**: 34
 - **Backend**: Firebase
   - Firebase Authentication - авторизация пользователей
   - Firebase Realtime Database - синхронизация игрового состояния
   - Firebase Storage - хранение файлов
   - Firebase Cloud Messaging - push-уведомления
 
+## 🛠 Инструменты сборки
+
+- **Android Gradle Plugin**: 8.1.0
+- **JDK**: 17
+- **Java Compatibility**: VERSION_17
+
 ## 📦 Зависимости
 
-- AndroidX AppCompat
-- ConstraintLayout
-- Kotlin Coroutines
-- Picasso - загрузка изображений
-- CircleImageView - круглые аватарки
+- AndroidX Core KTX 1.12.0
+- AndroidX AppCompat 1.6.1
+- Material Design 1.10.0
+- ConstraintLayout 2.1.4
+- Kotlin Coroutines 1.7.3
+- Picasso 2.8 - загрузка изображений
+- CircleImageView 3.1.0 - круглые аватарки
+- Firebase BOM 32.7.0
+  - Firebase Auth
+  - Firebase Storage
+  - Firebase Realtime Database
+  - Firebase Cloud Messaging
 
 ## 🚀 Сборка и запуск
 
 ### Требования
-- Android Studio 4.1+
-- JDK 8+
+- Android Studio Hedgehog (2023.1.1) или новее
+- JDK 17
 - Настроенный проект Firebase
 
 ### Шаги
@@ -60,7 +74,7 @@ cd <project-directory>
 ./gradlew assembleDebug
 ```
 
-Или используйте Android Studio для запуска на эмуляторе/устройстве.
+Или используйте Android Studio для запуска на эмуляторе/устройстве с Android 14.
 
 ## 📱 Структура приложения
 
@@ -77,13 +91,14 @@ app/
 └── build.gradle
 ```
 
-## 🔐Permissions
+## 🔐 Permissions
 
 Приложение запрашивает следующие разрешения:
 - `INTERNET` - доступ к сети
 - `ACCESS_NETWORK_STATE` - проверка состояния сети
 - `WAKE_LOCK` - предотвращение перехода в спящий режим
 - `VIBRATE` - вибрация при уведомлениях
+- `POST_NOTIFICATIONS` - отправка push-уведомлений (требуется для Android 13+)
 
 ## 📄 Лицензия
 
@@ -92,3 +107,18 @@ app/
 ## 👥 Авторы
 
 Разработано как учебный проект по работе с Firebase и Android.
+
+## ⚙️ Конфигурация
+
+### Версии SDK
+- **minSdk**: 21 (Android 5.0 Lollipop)
+- **targetSdk**: 34 (Android 14)
+- **compileSdk**: 34
+
+### Совместимость Java
+- Source Compatibility: Java 17
+- Target Compatibility: Java 17
+
+---
+
+**Примечание**: Проект полностью совместим с Android 14 и использует современные версии библиотек и инструментов сборки.
