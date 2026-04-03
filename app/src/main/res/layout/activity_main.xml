@@ -45,6 +45,75 @@
                 android:text="@string/accept" />
     </LinearLayout>
 
+    <!-- Индикатор загрузки -->
+    <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="10dp"
+            android:indeterminate="true"
+            android:visibility="gone" />
+
+    <!-- Статус подключения -->
+    <TextView
+            android:id="@+id/tvConnectionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="@string/connecting"
+            android:textColor="@color/colorPrimary"
+            android:textSize="14sp"
+            android:visibility="visible" />
+
+    <!-- Оверлей "Нет интернета" - блокирует весь экран -->
+    <FrameLayout
+            android:id="@+id/noInternetOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#CC000000"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            android:elevation="10dp">
+
+        <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="32dp"
+                android:background="@drawable/rounded_button_accept">
+
+            <ImageView
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@android:drawable/ic_dialog_alert"
+                    android:contentDescription="No internet icon"
+                    android:layout_marginBottom="16dp"/>
+
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Нет подключения к интернету"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:layout_marginBottom="8dp"/>
+
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Проверьте настройки сети и попробуйте снова"
+                    android:textColor="#DDDDDD"
+                    android:textSize="14sp"
+                    android:gravity="center"/>
+        </LinearLayout>
+    </FrameLayout>
+
     <TableLayout
             android:layout_width="match_parent"
             android:layout_height="363dp"

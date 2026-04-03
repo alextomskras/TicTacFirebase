@@ -1,1 +1,28 @@
-Nothing to output - the file changes contain only a modified README.md file, which is a source/config file, and there are no build artifacts, dependencies, or temp files that need to be ignored.
+```
+# Compiled and build artifacts
+*.class
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
+*.out
+build/
+# Dependencies
+.gradle/
+node_modules/
+__pycache__/
+*.pyc
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+# Environment
+.env
+.env.local
+*.env.*
+# Editors
+.vscode/
+.idea/
+```
