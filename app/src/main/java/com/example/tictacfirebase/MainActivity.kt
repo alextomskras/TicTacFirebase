@@ -20,14 +20,9 @@ import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import coil.load
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.*
@@ -41,12 +36,8 @@ open class MainActivity : AppCompatActivity() {
     private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
-    // Repository для работы с Firebase
+    // Repository для работы с Firebase - инициализируем в onCreate
     private lateinit var gameRepository: GameRepository
-
-    // Database instance (оставляем для обратной совместимости, но постепенно убираем)
-    private var database = FirebaseDatabase.getInstance()
-    private var myRef = database.reference
 
     var myEmail: String? = null
 
@@ -54,7 +45,7 @@ open class MainActivity : AppCompatActivity() {
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
     
     // Переменные для управления подписками
-    private var incomingRequestsListener: ValueEventListener? = null
+    private var incomingRequestsJob: kotlinx.coroutines.Job? = null
 
     // UI Views
     private lateinit var progressBar: android.widget.ProgressBar
@@ -157,59 +148,38 @@ open class MainActivity : AppCompatActivity() {
      */
     private fun setupIncomingRequestsListener() {
         myEmail?.let { email ->
-            incomingRequestsListener = object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    try {
-                        val td = snapshot.value as? HashMap<String, Any>
-                        if (td != null) {
-                            var value: String
-                            for (key in td.keys) {
-                                value = td[key] as String
-                                Log.d(TAG, "Incoming request from: $value")
-                                etEmail.setText(value)
-                                
-                                // Отправляем уведомление (FCM)
-                                perfotmFCMSendMessages()
-                                
-                                // Активируем кнопку принятия запроса
-                                buAcceptEvent.isEnabled = true
-                                buAcceptEvent.tag = "enabled"
-                                
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Игрок $value хочет сыграть!",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                
-                                // Очищаем запрос после обработки
-                                myRef.child("users")
-                                    .child(email.splitEmail())
-                                    .child("request")
-                                    .setValue(true)
-                                
-                                break
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error processing incoming request: ${e.message}")
+            incomingRequestsJob = lifecycleScope.launch {
+                try {
+                    // Слушаем запросы через Flow из repository
+                    gameRepository.observeGameRequests(email.splitEmail()).collect { requesterEmail ->
+                        Log.d(TAG, "Incoming request from: $requesterEmail")
+                        etEmail.setText(requesterEmail)
+                        
+                        // Отправляем уведомление (FCM)
+                        perfotmFCMSendMessages()
+                        
+                        // Активируем кнопку принятия запроса
+                        buAcceptEvent.isEnabled = true
+                        buAcceptEvent.tag = "enabled"
+                        
                         Toast.makeText(
                             this@MainActivity,
-                            "Ошибка обработки запроса: ${e.message}",
+                            "Игрок $requesterEmail хочет сыграть!",
                             Toast.LENGTH_LONG
                         ).show()
+                        
+                        // Очищаем запрос после обработки
+                        gameRepository.clearGameRequest(email.splitEmail())
                     }
-                }
-                
-                override fun onCancelled(error: DatabaseError) {
-                    Log.e(TAG, "Error listening for incoming requests: ${error.message}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error processing incoming request: ${e.message}")
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Ошибка обработки запроса: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
-            
-            // Подписываемся на обновления
-            myRef.child("users")
-                .child(email.splitEmail())
-                .child("request")
-                .addValueEventListener(incomingRequestsListener!!)
         }
     }
     
@@ -217,14 +187,6 @@ open class MainActivity : AppCompatActivity() {
         super.onDestroy()
         // Отменяем все корутины
         incomingRequestsJob?.cancel()
-        
-        // Удаляем слушатели Firebase
-        myEmail?.let { email ->
-            if (incomingRequestsListener != null) {
-                myRef.child("users").child(email.splitEmail()).child("request")
-                    .removeEventListener(incomingRequestsListener!!)
-            }
-        }
         
         // Скрываем индикатор загрузки
         showLoading(false)
