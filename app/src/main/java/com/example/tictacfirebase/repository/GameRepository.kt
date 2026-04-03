@@ -92,6 +92,48 @@ class GameRepository {
     }
     
     /**
+     * Наблюдение за входящими запросами на игру (возвращает email отправителя)
+     */
+    fun observeGameRequests(userEmail: String): Flow<String> = callbackFlow {
+        val splitEmail = userEmail.substringBefore("@")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    val td = snapshot.value as? HashMap<String, Any>
+                    if (td != null && td.isNotEmpty()) {
+                        // Берем первый запрос
+                        val requesterEmail = td.values.firstOrNull() as? String
+                        if (requesterEmail != null) {
+                            trySend(requesterEmail)
+                        }
+                    }
+                } catch (e: Exception) {
+                    println("observeGameRequests error: $e")
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                println("observeGameRequests cancelled: ${error.message}")
+            }
+        }
+        
+        myRef.child("users").child(splitEmail).child("request").addValueEventListener(listener)
+        
+        awaitClose {
+            myRef.child("users").child(splitEmail).child("request").removeEventListener(listener)
+        }
+    }
+    
+    /**
+     * Очистка запроса пользователя после обработки
+     */
+    suspend fun clearGameRequest(userEmail: String): Result<Unit> {
+        return runCatchingResult {
+            myRef.child("users").child(userEmail).child("request").setValue(true).await()
+        }
+    }
+
+    /**
      * Прослушивание входящих запросов на игру
      */
     fun observeIncomingRequests(userEmail: String): Flow<List<String>> = callbackFlow {
