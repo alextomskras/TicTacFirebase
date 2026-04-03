@@ -4,7 +4,7 @@ package com.example.tictacfirebase.utils
  * Универсальный класс для представления результата операции.
  * Позволяет избежать использования исключений для контроля потока выполнения.
  */
-sealed class Result<out T> {
+sealed class Result<T> {
     data class Success<out T>(val data: T) : Result<T>()
     data class Error(val exception: Throwable, val message: String? = null) : Result<Nothing>()
     object Loading : Result<Nothing>()
