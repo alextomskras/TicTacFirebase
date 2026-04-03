@@ -70,6 +70,7 @@ open class MainActivity : AppCompatActivity() {
     // UI Views
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
+    private lateinit var noInternetOverlay: android.widget.FrameLayout
     
     // Игровые переменные
     private var sessionID: String? = null
@@ -84,6 +85,15 @@ open class MainActivity : AppCompatActivity() {
     private val buAcceptEvent by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.buAcceptEvent) }
     private val burequest by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.burequest) }
     private val etEmail by lazy { findViewById<android.widget.EditText>(com.example.tictacfirebase.R.id.etEmail) }
+    private val bu1 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu1) }
+    private val bu2 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu2) }
+    private val bu3 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu3) }
+    private val bu4 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu4) }
+    private val bu5 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu5) }
+    private val bu6 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu6) }
+    private val bu7 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu7) }
+    private val bu8 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu8) }
+    private val bu9 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu9) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,6 +102,7 @@ open class MainActivity : AppCompatActivity() {
         // Инициализация UI элементов
         progressBar = findViewById(com.example.tictacfirebase.R.id.progressBar)
         tvConnectionStatus = findViewById(com.example.tictacfirebase.R.id.tvConnectionStatus)
+        noInternetOverlay = findViewById(com.example.tictacfirebase.R.id.noInternetOverlay)
         
         // Инициализация repository и game manager
         gameRepository = GameRepository()
@@ -157,6 +168,26 @@ open class MainActivity : AppCompatActivity() {
      */
     private fun showLoading(show: Boolean) {
         progressBar.visibility = if (show) View.VISIBLE else View.GONE
+    }
+    
+    /**
+     * Показать/скрыть оверлей "Нет интернета"
+     */
+    private fun showNoInternetOverlay(show: Boolean) {
+        noInternetOverlay.visibility = if (show) View.VISIBLE else View.GONE
+        // Блокируем все UI элементы когда нет интернета
+        bu1.isEnabled = !show
+        bu2.isEnabled = !show
+        bu3.isEnabled = !show
+        bu4.isEnabled = !show
+        bu5.isEnabled = !show
+        bu6.isEnabled = !show
+        bu7.isEnabled = !show
+        bu8.isEnabled = !show
+        bu9.isEnabled = !show
+        burequest.isEnabled = !show
+        buAcceptEvent.isEnabled = !show && buAcceptEvent.tag == "enabled"
+        etEmail.isEnabled = !show
     }
 
     private fun refreshTokens(): String? {
