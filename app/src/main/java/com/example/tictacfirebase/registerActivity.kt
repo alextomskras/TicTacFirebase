@@ -13,9 +13,8 @@ import com.example.tictacfirebase.models.User
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.iid.FirebaseInstanceId
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.FirebaseStorage
-import kotlinx.android.synthetic.main.activity_register.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -172,17 +171,22 @@ class registerActivity : AppCompatActivity() {
     }
 
     private fun refreshTokens(): String? {
-        val newToken = FirebaseInstanceId.getInstance().token
-        Log.d("newToken", (newToken))
-        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                return@addOnCompleteListener
+            }
+            val newToken = task.result
+            Log.d("newToken", newToken)
+            Toast.makeText(this, "Token: $newToken", Toast.LENGTH_SHORT).show()
 
-
-        if (newToken != null) {
-            GlobalScope.launch(Dispatchers.IO) {
-                MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+            if (newToken != null) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+                }
             }
         }
-        return newToken
+        return null
     }
 
 

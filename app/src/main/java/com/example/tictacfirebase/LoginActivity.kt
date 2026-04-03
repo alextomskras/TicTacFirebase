@@ -9,8 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.iid.FirebaseInstanceId
-import kotlinx.android.synthetic.main.activity_login.*
+import com.google.firebase.messaging.FirebaseMessaging
 
 class LoginActivity : AppCompatActivity() {
     companion object {
@@ -80,25 +79,29 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    private fun refreshTokens(stripEmail: String): String? {
-        val newToken = FirebaseInstanceId.getInstance().token
-        Log.d("newToken", (newToken))
-        Toast.makeText(this, "Please fill out $newToken", Toast.LENGTH_SHORT).show()
+    private fun refreshTokens(stripEmail: String) {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                return@addOnCompleteListener
+            }
+            val newToken = task.result
+            Log.d("newToken", newToken)
+            Toast.makeText(this, "Token: $newToken", Toast.LENGTH_SHORT).show()
 
+            if (newToken != null) {
+                MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+                val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
+                ref.setValue(newToken)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Finally we saved the Token to Firebase Database")
+                    }
+                    .addOnFailureListener {
+                        Log.d(TAG, "Failed to set value to database: ${it.message}")
+                    }
 
-        if (newToken != null) {
-            MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
-            val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
-            ref.setValue(newToken)
-                .addOnSuccessListener {
-                    Log.d(TAG, "Finally we saved the Token to Firebase Database")
-                }
-                .addOnFailureListener {
-                    Log.d(TAG, "Failed to set value to database: ${it.message}")
-                }
-
+            }
         }
-        return newToken
     }
 
     fun SplitString(str: String): String {
