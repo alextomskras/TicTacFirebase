@@ -113,32 +113,19 @@ class GameRepository {
     
     /**
      * Получение профиля пользователя (URL аватара)
+     * Возвращает URL изображения или null если не найдено
      */
-    fun observeUserProfile(email: String): Flow<String?> = callbackFlow {
-        val splitEmail = email.substringBefore("@")
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                try {
-                    val profileImageUrl = snapshot.child("profileImageUrl").value as? String
-                    trySend(profileImageUrl)
-                } catch (e: Exception) {
-                    println("observeUserProfile error: $e")
-                    trySend(null)
-                }
-            }
-            
-            override fun onCancelled(error: DatabaseError) {
-                println("observeUserProfile cancelled: ${error.message}")
-                trySend(null)
-            }
-        }
-        
-        myRef.child("users").child(splitEmail).addValueEventListener(listener)
-        
-        awaitClose {
-            myRef.child("users").child(splitEmail).removeEventListener(listener)
+    suspend fun getUserProfileImage(email: String): String? {
+        return try {
+            val splitEmail = email.substringBefore("@")
+            val snapshot = myRef.child("users").child(splitEmail).child("profileImageUrl").get().await()
+            snapshot.value as? String
+        } catch (e: Exception) {
+            println("getUserProfileImage error: $e")
+            null
         }
     }
+
     
     /**
      * Очистка запросов пользователя после обработки

@@ -2,51 +2,57 @@
 # Gradle
 .gradle/
 build/
-!gradlew
+!gradle/wrapper/dists
+*.gradle
 
 # Android
 *.apk
-*.aar
-*.iml
-local.properties
+*.ap_
+*.aab
+captures/
+.externalNativeBuild
+.intermediates
+.profile
+.thumbnails
 
 # Kotlin
 *.kotlin_metadata
 
-# Java
-*.class
-*.jar
-*.war
-*.ear
+# Local configuration file (sdk path, etc)
+local.properties
 
-# Environment
-.env
-.env.local
-*.env.*
-
-# Dependencies
-node_modules/
-vendor/
-
-# Logs
+# Log Files
 *.log
+
+# Built application files
+*.apk
+*.aar
+*.ap_
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class file
+*.class
+
+# Generated files
+gen/
+out/
+
+# Android Studio Navigation editor temp files
+.navigation/
+
+# Android Studio profiler
+*.hprof
+
+# Backup for IonicCordovaPlugin.java
+*.bak
+
+# Unit Tests
+test-results/
+*.cover
 
 # OS generated files
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Temp files
-*.tmp
-*.temp
 ```

@@ -23,10 +23,9 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
-import com.squareup.picasso.Picasso
+import coil.load
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -308,7 +307,7 @@ open class MainActivity : AppCompatActivity() {
 
                 // Загружаем аватар противника
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                Picasso.get().load(opponentAvatarUrl).into(image_View_user2)
+                image_View_user2.load(opponentAvatarUrl)
 
                 // Отправляем запрос на игру через repository
                 gameRepository.sendGameRequest(myEmail!!, userDemail)
@@ -345,7 +344,7 @@ open class MainActivity : AppCompatActivity() {
                 
                 // Загружаем аватар противника
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                Picasso.get().load(opponentAvatarUrl).into(image_View_user2)
+                image_View_user2.load(opponentAvatarUrl)
 
                 // Создаем сессию игры
                 sessionID = splitEmailFull(userDemail) + splitEmailFull(myEmail!!)
@@ -369,7 +368,7 @@ open class MainActivity : AppCompatActivity() {
      */
     private suspend fun loadOpponentAvatar(email: String): String? {
         return try {
-            gameRepository.observeUserProfile(email).firstOrNull()
+            gameRepository.getUserProfileImage(email)
         } catch (e: Exception) {
             Log.e(TAG, "Error loading avatar: ${e.message}")
             null
