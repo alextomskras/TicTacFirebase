@@ -45,6 +45,28 @@
                 android:text="@string/accept" />
     </LinearLayout>
 
+    <!-- Индикатор загрузки -->
+    <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="10dp"
+            android:indeterminate="true"
+            android:visibility="gone" />
+
+    <!-- Статус подключения -->
+    <TextView
+            android:id="@+id/tvConnectionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="@string/connecting"
+            android:textColor="@color/colorPrimary"
+            android:textSize="14sp"
+            android:visibility="visible" />
+
     <TableLayout
             android:layout_width="match_parent"
             android:layout_height="363dp"

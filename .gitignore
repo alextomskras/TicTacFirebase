@@ -1,34 +1,52 @@
 ```
-# Backup files
-*.backup
-
-# Build artifacts
-build/
+# Gradle
 .gradle/
+build/
+!gradlew
 
-# Dependencies
-node_modules/
-.venv/
-venv/
-__pycache__/
+# Android
+*.apk
+*.aar
+*.iml
+local.properties
 
-# IDE files
-.vscode/
-.idea/
+# Kotlin
+*.kotlin_metadata
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
 
 # Environment
 .env
 .env.local
 *.env.*
 
+# Dependencies
+node_modules/
+vendor/
+
 # Logs
 *.log
 
-# Temp files
-*.tmp
-*.swp
-
-# OS files
+# OS generated files
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Temp files
+*.tmp
+*.temp
 ```
