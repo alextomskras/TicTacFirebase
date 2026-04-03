@@ -9,12 +9,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.example.tictacfirebase.game.GameManager
-import com.example.tictacfirebase.game.WinResult
-import com.example.tictacfirebase.model.GameState
-import com.example.tictacfirebase.model.GameStatus
 import com.example.tictacfirebase.model.UiEvent
-import com.example.tictacfirebase.models.User
 import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.example.tictacfirebase.utils.AppConstants
@@ -48,9 +43,6 @@ open class MainActivity : AppCompatActivity() {
 
     // Repository для работы с Firebase
     private lateinit var gameRepository: GameRepository
-    
-    // Менеджер игры для локальной логики
-    private lateinit var gameManager: GameManager
 
     // Database instance (оставляем для обратной совместимости, но постепенно убираем)
     private var database = FirebaseDatabase.getInstance()
@@ -62,13 +54,7 @@ open class MainActivity : AppCompatActivity() {
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
     
     // Переменные для управления подписками
-    private var gameSessionListener: ValueEventListener? = null
     private var incomingRequestsListener: ValueEventListener? = null
-    private var userProfileListener: ValueEventListener? = null
-    
-    // Coroutine jobs для отмены в onDestroy
-    private var gameSessionJob: Job? = null
-    private var incomingRequestsJob: Job? = null
 
     // UI Views
     private lateinit var progressBar: android.widget.ProgressBar
@@ -77,13 +63,6 @@ open class MainActivity : AppCompatActivity() {
     
     // GameViewModel для управления состоянием игры и сетью
     private lateinit var gameViewModel: GameViewModel
-    
-    // Игровые переменные
-    private var sessionID: String? = null
-    private var playerSymbol: String? = null
-    private var activePlayer = 1
-    private var player1 = ArrayList<Int>()
-    private var player2 = ArrayList<Int>()
     
     // Image views
     private val image_View_user2 by lazy { findViewById<de.hdodenhof.circleimageview.CircleImageView>(com.example.tictacfirebase.R.id.image_View_user2) }
@@ -110,9 +89,8 @@ open class MainActivity : AppCompatActivity() {
         tvConnectionStatus = findViewById(com.example.tictacfirebase.R.id.tvConnectionStatus)
         noInternetOverlay = findViewById(com.example.tictacfirebase.R.id.noInternetOverlay)
         
-        // Инициализация repository и game manager
+        // Инициализация repository
         gameRepository = GameRepository()
-        gameManager = GameManager()
         
         //Hide img+player2name
         player2_text_View.visibility = View.GONE
@@ -238,16 +216,9 @@ open class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         // Отменяем все корутины
-        gameSessionJob?.cancel()
         incomingRequestsJob?.cancel()
         
         // Удаляем слушатели Firebase
-        sessionID?.let {
-            if (gameSessionListener != null) {
-                myRef.child("PlayerOnline").child(it).removeEventListener(gameSessionListener!!)
-            }
-        }
-        
         myEmail?.let { email ->
             if (incomingRequestsListener != null) {
                 myRef.child("users").child(email.splitEmail()).child("request")
@@ -366,152 +337,41 @@ open class MainActivity : AppCompatActivity() {
         gameViewModel.onEvent(com.example.tictacfirebase.model.UiEvent.CellSelected(cellID))
     }
 
-    // Игровые переменные перенесены в начало класса
-    // Используем gameManager для логики игры
-    
-    /**
-     * Локальная игра (для тестирования или офлайн режима)
-     * В продакшене лучше использовать только сетевую игру через repository
-     */
-    fun PlayGame(cellID: Int, buSelected: Button) {
-        // Используем GameManager для проверки валидности хода
-        if (!gameManager.makeMove(cellID)) {
-            Toast.makeText(this, "Invalid move", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (activePlayer == 1) {
-            buSelected.text = "X"
-            buSelected.setBackgroundResource(R.color.blue)
-            activePlayer = 2
-        } else {
-            buSelected.text = "O"
-            buSelected.setBackgroundResource(R.color.darkgreen)
-            activePlayer = 1
-        }
-
-        buSelected.isEnabled = false
-        
-        // Проверяем победителя через GameManager
-        when (gameManager.checkWinner()) {
-            is WinResult.Player1Wins -> {
-                Toast.makeText(this, "Player 1 wins the game", Toast.LENGTH_LONG).show()
-                restartGame()
-            }
-            is WinResult.Player2Wins -> {
-                Toast.makeText(this, "Player 2 wins the game", Toast.LENGTH_LONG).show()
-                restartGame()
-            }
-            is WinResult.Draw -> {
-                Toast.makeText(this, "Draw!", Toast.LENGTH_LONG).show()
-                restartGame()
-            }
-            else -> {
-                // Игра продолжается
-            }
-        }
-    }
-    
-    /**
-     * Устаревший метод проверки победителя
-     * Используется GameManager вместо ручной проверки
-     */
-    @Deprecated("Use GameManager instead")
-    fun CheckWiner() {
-        // Этот метод больше не используется, логика перенесена в PlayGame
-    }
-
-    fun AutoPlay(cellID: Int) {
-
-
-        val buSelect: Button? = when (cellID) {
-            1 -> bu1
-            2 -> bu2
-            3 -> bu3
-            4 -> bu4
-            5 -> bu5
-            6 -> bu6
-            7 -> bu7
-            8 -> bu8
-            9 -> bu9
-            else -> {
-                bu1
-            }
-        }
-
-        buSelect?.let { PlayGame(cellID, it) }
-
-    }
-
     fun buRequestEvent(view: View) {
+        val userDemail = etEmail.text.toString()
+        
+        //unHide player2 icon
+        player2_text_View.visibility = View.VISIBLE
+        image_View_user2.visibility = View.VISIBLE
+        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+
+        // Загружаем аватар противника
         lifecycleScope.launch {
-            try {
-                showLoading(true)
-                
-                val userUID = FirebaseAuth.getInstance().uid.toString()
-                val userDemail = etEmail.text.toString()
-
-                //unHide player2 icon
-                player2_text_View.visibility = View.VISIBLE
-                image_View_user2.visibility = View.VISIBLE
-                player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
-
-                // Загружаем аватар противника
-                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                image_View_user2.load(opponentAvatarUrl)
-
-                // Отправляем запрос на игру через repository
-                gameRepository.sendGameRequest(myEmail!!, userDemail)
-                
-                // Создаем сессию игры
-                sessionID = splitEmailFull(myEmail!!) + splitEmailFull(userDemail)
-                gameRepository.createGameSession(sessionID!!)
-                
-                playerSymbol = AppConstants.SYMBOL_X
-                
-                updateConnectionStatus(getString(R.string.waiting_for_opponent))
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending request: ${e.message}")
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                showLoading(false)
-            }
+            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+            image_View_user2.load(opponentAvatarUrl)
         }
+
+        // Отправляем событие в ViewModel
+        gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
     }
 
 
     fun buAcceptEvent(view: View) {
+        val userDemail = etEmail.text.toString()
+        
+        //unHide player2 icon
+        player2_text_View.visibility = View.VISIBLE
+        image_View_user2.visibility = View.VISIBLE
+        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+        
+        // Загружаем аватар противника
         lifecycleScope.launch {
-            try {
-                showLoading(true)
-                
-                val userDemail = etEmail.text.toString()
-                
-                //unHide player2 icon
-                player2_text_View.visibility = View.VISIBLE
-                image_View_user2.visibility = View.VISIBLE
-                player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
-                
-                // Загружаем аватар противника
-                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                image_View_user2.load(opponentAvatarUrl)
-
-                // Создаем сессию игры
-                sessionID = splitEmailFull(userDemail) + splitEmailFull(myEmail!!)
-                gameRepository.createGameSession(sessionID!!)
-                
-                playerSymbol = AppConstants.SYMBOL_O
-                
-                updateConnectionStatus(getString(R.string.your_turn))
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error accepting request: ${e.message}")
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                showLoading(false)
-            }
+            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+            image_View_user2.load(opponentAvatarUrl)
         }
+
+        // Отправляем событие в ViewModel
+        gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
     }
     
     /**
