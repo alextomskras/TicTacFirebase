@@ -8,6 +8,10 @@ android {
     namespace 'com.example.tictacfirebase'
     compileSdk 34
     
+    buildFeatures {
+        viewBinding true
+    }
+    
     defaultConfig {
         applicationId "com.example.tictacfirebase"
         minSdk 21
