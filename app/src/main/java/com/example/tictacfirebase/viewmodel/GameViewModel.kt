@@ -103,53 +103,72 @@ class GameViewModel(
             // Загружаем имена и аватарки
             val playerNamesResult = gameRepository.getPlayerNames(gameId)
             
-            playerNamesResult.fold(
-                onSuccess = { playerNames ->
-                    val myName = playerNames.first
-                    val opponentName = playerNames.second
-                    
-                    // Загружаем аватарки (асинхронно, не блокируя основной поток)
-                    val myAvatarResult = gameRepository.getUserProfileImage(myName)
-                    val opponentAvatarResult = gameRepository.getUserProfileImage(opponentName)
-                    
-                    val myAvatar = myAvatarResult.getOrNull()
-                    val opponentAvatar = opponentAvatarResult.getOrNull()
+            if (playerNamesResult is com.example.tictacfirebase.utils.Result.Success) {
+                val playerNames = playerNamesResult.data
+                val myName = playerNames.first
+                val opponentName = playerNames.second
+                
+                // Загружаем аватарки (асинхронно, не блокируя основной поток)
+                val myAvatarResult = gameRepository.getUserProfileImage(myName)
+                val opponentAvatarResult = gameRepository.getUserProfileImage(opponentName)
+                
+                val myAvatar = if (myAvatarResult is com.example.tictacfirebase.utils.Result.Success) myAvatarResult.data else null
+                val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
 
-                    updateState {
-                        copy(
-                            currentPlayerName = myName,
-                            opponentName = opponentName,
-                            playerAvatarUrl = myAvatar,
-                            opponentAvatarUrl = opponentAvatar,
-                            isLoading = false,
-                            sessionId = gameId
-                        )
-                    }
-                },
-                onFailure = { error ->
-                    updateState { 
-                        copy(
-                            isLoading = false,
-                            errorMessage = "Ошибка загрузки данных: ${error.message}"
-                        )
-                    }
-                    sendEffect(UiEffect.ShowToast("Ошибка: ${error.message}"))
+                updateState {
+                    copy(
+                        currentPlayerName = myName,
+                        opponentName = opponentName,
+                        playerAvatarUrl = myAvatar,
+                        opponentAvatarUrl = opponentAvatar,
+                        isLoading = false,
+                        sessionId = gameId
+                    )
                 }
-            )
+            } else if (playerNamesResult is com.example.tictacfirebase.utils.Result.Error) {
+                val error = playerNamesResult.exception
+                val errorMessage = playerNamesResult.message ?: error.message ?: "Неизвестная ошибка"
+                updateState { 
+                    copy(
+                        isLoading = false,
+                        errorMessage = "Ошибка загрузки данных: $errorMessage"
+                    )
+                }
+                sendEffect(com.example.tictacfirebase.model.UiEffect.ShowToast("Ошибка: $errorMessage"))
+            }
         }
     }
 
     private fun observeGameChanges() {
         viewModelScope.launch {
             gameRepository.observeBoardState(gameId).collect { board ->
-                val currentTurn = gameRepository.getCurrentTurn(gameId)
+                val currentTurnResult = gameRepository.getCurrentTurn(gameId)
+                val currentTurn = if (currentTurnResult is com.example.tictacfirebase.utils.Result.Success) currentTurnResult.data else ""
                 val myName = _gameState.value.currentPlayerName
                 
                 // Обновляем состояние доски
                 val newBoardState = board.map { it ?: "" }
                 
-                // Определяем результат игры
-                val winResult = gameManager.checkWin(newBoardState)
+                // Определяем результат игры с помощью GameManager
+                // Преобразуем доску в формат, понятный GameManager (списки ходов)
+                val player1Moves = mutableListOf<Int>()
+                val player2Moves = mutableListOf<Int>()
+                newBoardState.forEachIndexed { index, value ->
+                    if (value == "X") {
+                        player1Moves.add(index + 1)
+                    } else if (value == "O") {
+                        player2Moves.add(index + 1)
+                    }
+                }
+                
+                // Создаем временное состояние для проверки победы
+                val tempGameState = com.example.tictacfirebase.game.GameState(
+                    player1Moves = player1Moves,
+                    player2Moves = player2Moves
+                )
+                
+                // Проверяем победителя
+                val winResult = checkWin(tempGameState)
                 
                 val newStatus = when {
                     winResult != null -> {
@@ -180,6 +199,40 @@ class GameViewModel(
             }
         }
     }
+    
+    /**
+     * Проверка победителя на основе состояния игры
+     * @param gameState Состояние игры с ходами игроков
+     * @return Результат проверки (null если игра продолжается, иначе объект с победителем)
+     */
+    private fun checkWin(gameState: com.example.tictacfirebase.game.GameState): WinResult? {
+        val winningCombinations = listOf(
+            listOf(1, 2, 3), listOf(4, 5, 6), listOf(7, 8, 9), // Ряды
+            listOf(1, 4, 7), listOf(2, 5, 8), listOf(3, 6, 9), // Колонки
+            listOf(1, 5, 9), listOf(3, 5, 7) // Диагонали
+        )
+        
+        for (combination in winningCombinations) {
+            if (gameState.player1Moves.containsAll(combination)) {
+                return WinResult(winner = gameState.player1Moves.first().toString()) // Возвращаем игрока 1
+            }
+            if (gameState.player2Moves.containsAll(combination)) {
+                return WinResult(winner = gameState.player2Moves.first().toString()) // Возвращаем игрока 2
+            }
+        }
+        
+        // Проверка на ничью
+        if (gameState.player1Moves.size + gameState.player2Moves.size == 9) {
+            return WinResult(winner = "Draw")
+        }
+        
+        return null
+    }
+    
+    /**
+     * Результат проверки победителя
+     */
+    private data class WinResult(val winner: String?)
 
     fun onEvent(event: UiEvent) {
         when (event) {
@@ -233,44 +286,41 @@ class GameViewModel(
 
             // Определяем мой символ
             val mySymbolResult = gameRepository.getFirstPlayer(gameId)
-            val mySymbol = if (currentState.currentPlayerName == mySymbolResult.getOrNull()) "X" else "O"
+            val firstPlayer = if (mySymbolResult is com.example.tictacfirebase.utils.Result.Success) mySymbolResult.data else ""
+            val mySymbol = if (currentState.currentPlayerName == firstPlayer) "X" else "O"
 
             board[cellIndex] = mySymbol
             
             // Отправляем ход на сервер
             val updateResult = gameRepository.updateBoardState(gameId, board)
             
-            updateResult.fold(
-                onSuccess = {
-                    // Ход успешно отправлен
-                },
-                onFailure = { error ->
-                    sendEffect(UiEffect.ShowToast("Ошибка хода: ${error.message}"))
-                }
-            )
+            if (updateResult is com.example.tictacfirebase.utils.Result.Error) {
+                val errorMessage = updateResult.message ?: updateResult.exception.message ?: "Неизвестная ошибка"
+                sendEffect(UiEffect.ShowToast("Ошибка хода: $errorMessage"))
+            }
+            // В случае успеха ничего не делаем - состояние обновится через observeGameChanges
         }
     }
 
     private fun restartGame() {
         viewModelScope.launch {
             val currentTurnResult = gameRepository.getCurrentTurn(gameId)
+            val currentTurn = if (currentTurnResult is com.example.tictacfirebase.utils.Result.Success) currentTurnResult.data else ""
             val restartResult = gameRepository.restartGame(gameId)
             
-            restartResult.fold(
-                onSuccess = {
-                    updateState {
-                        copy(
-                            boardState = List(9) { "" },
-                            gameStatus = GameStatus.Playing,
-                            isMyTurn = currentTurnResult.getOrNull() == currentPlayerName
-                        )
-                    }
-                    sendEffect(UiEffect.ShowToast("Игра перезапущена"))
-                },
-                onFailure = { error ->
-                    sendEffect(UiEffect.ShowToast("Ошибка перезапуска: ${error.message}"))
+            if (restartResult is com.example.tictacfirebase.utils.Result.Success) {
+                updateState {
+                    copy(
+                        boardState = List(9) { "" },
+                        gameStatus = GameStatus.Playing,
+                        isMyTurn = currentTurn == _gameState.value.currentPlayerName
+                    )
                 }
-            )
+                sendEffect(UiEffect.ShowToast("Игра перезапущена"))
+            } else if (restartResult is com.example.tictacfirebase.utils.Result.Error) {
+                val errorMessage = restartResult.message ?: restartResult.exception.message ?: "Неизвестная ошибка"
+                sendEffect(UiEffect.ShowToast("Ошибка перезапуска: $errorMessage"))
+            }
         }
     }
 
