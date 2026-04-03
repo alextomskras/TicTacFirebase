@@ -26,6 +26,7 @@ import com.google.firebase.messaging.RemoteMessage
 import com.squareup.picasso.Picasso
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -62,24 +63,39 @@ open class MainActivity : AppCompatActivity() {
     private var gameSessionJob: Job? = null
     private var incomingRequestsJob: Job? = null
 
+    // UI Views
+    private lateinit var progressBar: android.widget.ProgressBar
+    private lateinit var tvConnectionStatus: android.widget.TextView
+    
     // Игровые переменные
     private var sessionID: String? = null
     private var playerSymbol: String? = null
     private var activePlayer = 1
     private var player1 = ArrayList<Int>()
     private var player2 = ArrayList<Int>()
+    
+    // Image views
+    private val image_View_user2 by lazy { findViewById<de.hdodenhof.circleimageview.CircleImageView>(com.example.tictacfirebase.R.id.image_View_user2) }
+    private val player2_text_View by lazy { findViewById<android.widget.TextView>(com.example.tictacfirebase.R.id.player2_text_View) }
+    private val buAcceptEvent by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.buAcceptEvent) }
+    private val burequest by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.burequest) }
+    private val etEmail by lazy { findViewById<android.widget.EditText>(com.example.tictacfirebase.R.id.etEmail) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        
+        // Инициализация UI элементов
+        progressBar = findViewById(com.example.tictacfirebase.R.id.progressBar)
+        tvConnectionStatus = findViewById(com.example.tictacfirebase.R.id.tvConnectionStatus)
         
         // Инициализация repository и game manager
         gameRepository = GameRepository()
         gameManager = GameManager()
         
         //Hide img+player2name
-        player2_text_View!!.visibility = View.GONE
-        image_View_user2!!.visibility = View.GONE
+        player2_text_View.visibility = View.GONE
+        image_View_user2.visibility = View.GONE
 
         //Block_ACCEPT_BUTTON
         buAcceptEvent.isEnabled = false
@@ -93,6 +109,9 @@ open class MainActivity : AppCompatActivity() {
         myEmail = b.getString(AppConstants.KEY_EMAIL)
         Log.d(TAG, "getExtraEmail: $myEmail")
         supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
+        
+        // Обновляем статус подключения
+        updateConnectionStatus(getString(R.string.connecting))
         
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
@@ -117,6 +136,23 @@ open class MainActivity : AppCompatActivity() {
                     .removeEventListener(incomingRequestsListener!!)
             }
         }
+        
+        // Скрываем индикатор загрузки
+        showLoading(false)
+    }
+    
+    /**
+     * Обновление статуса подключения
+     */
+    private fun updateConnectionStatus(status: String) {
+        tvConnectionStatus.text = status
+    }
+    
+    /**
+     * Показать/скрыть индикатор загрузки
+     */
+    private fun showLoading(show: Boolean) {
+        progressBar.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     private fun refreshTokens(): String? {
@@ -132,9 +168,14 @@ open class MainActivity : AppCompatActivity() {
             myEmail?.let { email ->
                 lifecycleScope.launch {
                     try {
+                        showLoading(true)
                         gameRepository.updateUserToken(email.splitEmail(), newToken)
+                        updateConnectionStatus(getString(R.string.connected))
                     } catch (e: Exception) {
                         Log.e(TAG, "Error updating token: ${e.message}")
+                        updateConnectionStatus(getString(R.string.error_connection))
+                    } finally {
+                        showLoading(false)
                     }
                 }
             }
@@ -156,17 +197,19 @@ open class MainActivity : AppCompatActivity() {
             com.example.tictacfirebase.R.id.bu8 -> cellID = AppConstants.CellIds.CELL_8
             com.example.tictacfirebase.R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
         }
-        Toast.makeText(this, "ID:" + cellID, Toast.LENGTH_LONG).show()
-
+        
         // Делаем ход через repository с использованием lifecycleScope
         sessionID?.let { sid ->
             myEmail?.let { email ->
                 lifecycleScope.launch {
                     try {
+                        showLoading(true)
                         gameRepository.makeMove(sid, cellID, email)
                     } catch (e: Exception) {
                         Log.e(TAG, "Error making move: ${e.message}")
                         Toast.makeText(this@MainActivity, "Error making move: ${e.message}", Toast.LENGTH_SHORT).show()
+                    } finally {
+                        showLoading(false)
                     }
                 }
             }
@@ -251,62 +294,87 @@ open class MainActivity : AppCompatActivity() {
     }
 
     fun buRequestEvent(view: View) {
-        GlobalScope.launch(Dispatchers.Main) {
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+                
+                val userUID = FirebaseAuth.getInstance().uid.toString()
+                val userDemail = etEmail.text.toString()
 
-            val userUID = FirebaseAuth.getInstance().uid.toString()
-            var userDemail = etEmail.text.toString()
+                //unHide player2 icon
+                player2_text_View.visibility = View.VISIBLE
+                image_View_user2.visibility = View.VISIBLE
+                player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
 
-            //unHide player2 icon
-            player2_text_View!!.visibility = View.VISIBLE
-            image_View_user2.visibility = View.VISIBLE
-            player2_text_View.text = "Player2-" + SplitString(userDemail)
+                // Загружаем аватар противника
+                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+                Picasso.get().load(opponentAvatarUrl).into(image_View_user2)
 
-
-            val pict1 = GlobalScope.launch(Dispatchers.IO) {
-                getImageProfile {
-                    Log.e(TAG, "PlayerPictIT1:" + it)
-                    val pict1 = it
-                    Picasso.get().load(pict1)
-                            .into(image_View_user2)
-                }
+                // Отправляем запрос на игру через repository
+                gameRepository.sendGameRequest(myEmail!!, userDemail)
+                
+                // Создаем сессию игры
+                sessionID = splitEmailFull(myEmail!!) + splitEmailFull(userDemail)
+                gameRepository.createGameSession(sessionID!!)
+                
+                playerSymbol = AppConstants.SYMBOL_X
+                
+                updateConnectionStatus(getString(R.string.waiting_for_opponent))
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending request: ${e.message}")
+                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                showLoading(false)
             }
-
-            Log.e(TAG, "PlayerPict1: $pict1")
-
-            myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
-            myRef.child("latest-messages").child(userUID).push().child(SplitString(userDemail)).child("request").push()
-                    .setValue(myEmail)
-
-
-            PlayerOnline(SplitString(myEmail!!) + SplitString(userDemail)) // husseinjena
-            PlayerSymbol = "X"
         }
     }
 
 
     fun buAcceptEvent(view: View) {
-        var userDemail = etEmail.text.toString()
-        myRef.child("users").child(SplitString(userDemail)).child("request").push().setValue(myEmail)
+        lifecycleScope.launch {
+            try {
+                showLoading(true)
+                
+                val userDemail = etEmail.text.toString()
+                
+                //unHide player2 icon
+                player2_text_View.visibility = View.VISIBLE
+                image_View_user2.visibility = View.VISIBLE
+                player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+                
+                // Загружаем аватар противника
+                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+                Picasso.get().load(opponentAvatarUrl).into(image_View_user2)
 
-        //unHide player2 icon
-        player2_text_View!!.visibility = View.VISIBLE
-        image_View_user2.visibility = View.VISIBLE
-
-        player2_text_View.text = "Player2-" + SplitString(userDemail)
-
-        PlayerOnline(SplitString(userDemail) + SplitString(myEmail!!)) //husseinjena
-        PlayerSymbol = "O"
-
+                // Создаем сессию игры
+                sessionID = splitEmailFull(userDemail) + splitEmailFull(myEmail!!)
+                gameRepository.createGameSession(sessionID!!)
+                
+                playerSymbol = AppConstants.SYMBOL_O
+                
+                updateConnectionStatus(getString(R.string.your_turn))
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error accepting request: ${e.message}")
+                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                showLoading(false)
+            }
+        }
     }
-
-
-    //var cellID: String? =
-    var sessionID: String? = null
-    var PlayerSymbol: String? = null
-
-
-
-
+    
+    /**
+     * Загрузка аватара противника из Firebase
+     */
+    private suspend fun loadOpponentAvatar(email: String): String? {
+        return try {
+            gameRepository.observeUserProfile(email).firstOrNull()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading avatar: ${e.message}")
+            null
+        }
+    }
 
 
 

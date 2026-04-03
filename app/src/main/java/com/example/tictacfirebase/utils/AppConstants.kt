@@ -36,6 +36,11 @@ object AppConstants {
 fun String.splitEmail(): String = this.substringBefore("@")
 
 /**
+ * Утилита для разделения email (оставлено для обратной совместимости)
+ */
+fun splitEmailFull(email: String): String = email.substringBefore("@")
+
+/**
  * Проверка на валидный email
  */
 fun String.isValidEmail(): Boolean {
