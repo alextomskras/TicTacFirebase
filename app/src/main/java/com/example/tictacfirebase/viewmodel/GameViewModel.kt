@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 /**
@@ -66,6 +67,34 @@ class GameViewModel(
         viewModelScope.launch {
             updateState { copy(isOnline = isOnline) }
         }
+    }
+
+    /**
+     * Наблюдение за входящими запросами на игру
+     */
+    fun observeGameRequests(userEmail: String): Flow<String> {
+        return gameRepository.observeGameRequests(userEmail)
+    }
+
+    /**
+     * Очистка запроса на игру после обработки
+     */
+    suspend fun clearGameRequest(userEmail: String) {
+        gameRepository.clearGameRequest(userEmail)
+    }
+
+    /**
+     * Обновление токена пользователя
+     */
+    suspend fun updateUserToken(userEmail: String, token: String) {
+        gameRepository.updateUserToken(userEmail, token)
+    }
+
+    /**
+     * Получение аватара пользователя
+     */
+    suspend fun getUserProfileImage(email: String): String? {
+        return gameRepository.getUserProfileImage(email).getOrNull()
     }
 
     private fun loadInitialData() {

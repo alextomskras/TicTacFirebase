@@ -19,7 +19,6 @@ import com.example.tictacfirebase.utils.splitEmailFull
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import coil.load
@@ -36,17 +35,11 @@ open class MainActivity : AppCompatActivity() {
     private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
-    // Repository для работы с Firebase - инициализируем в onCreate
-    private lateinit var gameRepository: GameRepository
-
     var myEmail: String? = null
 
     lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
     
-    // Переменные для управления подписками
-    private var incomingRequestsJob: kotlinx.coroutines.Job? = null
-
     // UI Views
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
@@ -80,8 +73,8 @@ open class MainActivity : AppCompatActivity() {
         tvConnectionStatus = findViewById(com.example.tictacfirebase.R.id.tvConnectionStatus)
         noInternetOverlay = findViewById(com.example.tictacfirebase.R.id.noInternetOverlay)
         
-        // Инициализация repository
-        gameRepository = GameRepository()
+        // Инициализация GameRepository для передачи в ViewModel
+        val gameRepository = GameRepository()
         
         //Hide img+player2name
         player2_text_View.visibility = View.GONE
@@ -148,10 +141,10 @@ open class MainActivity : AppCompatActivity() {
      */
     private fun setupIncomingRequestsListener() {
         myEmail?.let { email ->
-            incomingRequestsJob = lifecycleScope.launch {
+            lifecycleScope.launch {
                 try {
-                    // Слушаем запросы через Flow из repository
-                    gameRepository.observeGameRequests(email.splitEmail()).collect { requesterEmail ->
+                    // Слушаем запросы через Flow из ViewModel
+                    gameViewModel.observeGameRequests(email.splitEmail()).collect { requesterEmail ->
                         Log.d(TAG, "Incoming request from: $requesterEmail")
                         etEmail.setText(requesterEmail)
                         
@@ -169,7 +162,7 @@ open class MainActivity : AppCompatActivity() {
                         ).show()
                         
                         // Очищаем запрос после обработки
-                        gameRepository.clearGameRequest(email.splitEmail())
+                        gameViewModel.clearGameRequest(email.splitEmail())
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error processing incoming request: ${e.message}")
@@ -185,9 +178,6 @@ open class MainActivity : AppCompatActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
-        // Отменяем все корутины
-        incomingRequestsJob?.cancel()
-        
         // Скрываем индикатор загрузки
         showLoading(false)
     }
@@ -261,12 +251,12 @@ open class MainActivity : AppCompatActivity() {
             val newToken = task.result
             Log.d("newToken", newToken)
             
-            // Обновляем токен в базе данных с использованием lifecycleScope
+            // Обновляем токен в базе данных с использованием lifecycleScope через ViewModel
             myEmail?.let { email ->
                 lifecycleScope.launch {
                     try {
                         showLoading(true)
-                        gameRepository.updateUserToken(email.splitEmail(), newToken)
+                        gameViewModel.updateUserToken(email.splitEmail(), newToken)
                         updateConnectionStatus(getString(R.string.connected))
                     } catch (e: Exception) {
                         Log.e(TAG, "Error updating token: ${e.message}")
@@ -341,7 +331,7 @@ open class MainActivity : AppCompatActivity() {
      */
     private suspend fun loadOpponentAvatar(email: String): String? {
         return try {
-            gameRepository.getUserProfileImage(email)
+            gameViewModel.getUserProfileImage(email)
         } catch (e: Exception) {
             Log.e(TAG, "Error loading avatar: ${e.message}")
             null
@@ -360,7 +350,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
         fun perfotmFCMSendMessages() {
-        val fromId = FirebaseAuth.getInstance().uid
+//        val fromId = FirebaseAuth.getInstance().uid
 //        val user = intent.getParcelableExtra<User>(NewMessageActivity.USER_KEY)
         val user = myEmail
         val toId = user
@@ -370,7 +360,7 @@ open class MainActivity : AppCompatActivity() {
         val message = RemoteMessage.Builder(SENDER_ID + "@fcm.googleapis.com")
 
                 .setMessageId(Integer.toString(random.nextInt(9999)))
-                .addData("TEST1-- $fromId", "TEST1--  $toId")
+                .addData("TEST1-- $user", "TEST1--  $toId")
 //                    .addData(edt_key1.text.toString(), edt_value1.text.toString())
 //                    .addData(edt_key2.text.toString(), edt_value2.text.toString())
                 .build()
