@@ -9,13 +9,14 @@ import com.example.tictacfirebase.repository.GameRepository
  */
 class GameViewModelFactory(
     private val gameRepository: GameRepository,
-    private val gameId: String
+    private val gameId: String,
+    private val context: android.content.Context
 ) : ViewModelProvider.Factory {
     
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(GameViewModel::class.java)) {
-            return GameViewModel(gameRepository, gameId) as T
+            return GameViewModel(gameRepository, gameId, context) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

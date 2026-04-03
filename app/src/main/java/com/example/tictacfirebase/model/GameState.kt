@@ -6,6 +6,7 @@ package com.example.tictacfirebase.model
  */
 data class GameState(
     val isLoading: Boolean = false,
+    val isOnline: Boolean = true, // Статус подключения к интернету
     val isMyTurn: Boolean = false,
     val currentPlayerName: String = "",
     val opponentName: String = "",

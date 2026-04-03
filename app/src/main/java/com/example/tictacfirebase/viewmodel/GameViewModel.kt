@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
  */
 class GameViewModel(
     private val gameRepository: GameRepository,
-    private val gameId: String
+    private val gameId: String,
+    private val context: android.content.Context
 ) : ViewModel() {
 
     private val _gameState = MutableStateFlow(GameState())
@@ -27,8 +28,26 @@ class GameViewModel(
     private val gameManager = GameManager()
 
     init {
+        observeNetworkStatus()
         loadInitialData()
         observeGameChanges()
+    }
+
+    /**
+     * Наблюдение за статусом сети
+     */
+    private fun observeNetworkStatus() {
+        viewModelScope.launch {
+            com.example.tictacfirebase.utils.NetworkMonitor.observeNetworkConnectivity(context)
+                .collect { isOnline ->
+                    updateState { copy(isOnline = isOnline) }
+                    if (!isOnline) {
+                        updateState { 
+                            copy(errorMessage = "Нет подключения к интернету") 
+                        }
+                    }
+                }
+        }
     }
 
     private fun loadInitialData() {
@@ -118,6 +137,15 @@ class GameViewModel(
     private fun handleCellClick() {
         viewModelScope.launch {
             val currentState = _gameState.value
+            
+            // Блокируем клики если нет интернета
+            if (!currentState.isOnline) {
+                updateState { 
+                    copy(errorMessage = "Нет подключения к интернету") 
+                }
+                return@launch
+            }
+            
             if (!currentState.isMyTurn || currentState.gameStatus != GameStatus.Playing) {
                 return@launch
             }
@@ -130,6 +158,15 @@ class GameViewModel(
     fun makeMove(cellIndex: Int) {
         viewModelScope.launch {
             val currentState = _gameState.value
+            
+            // Блокируем ходы если нет интернета
+            if (!currentState.isOnline) {
+                updateState { 
+                    copy(errorMessage = "Нет подключения к интернету") 
+                }
+                return@launch
+            }
+            
             if (!currentState.isMyTurn || currentState.gameStatus != GameStatus.Playing) {
                 return@launch
             }
