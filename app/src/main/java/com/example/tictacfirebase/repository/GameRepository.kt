@@ -134,4 +134,135 @@ class GameRepository {
         val splitEmail = userEmail.substringBefore("@")
         myRef.child("users").child(splitEmail).child("request").setValue(true).await()
     }
+    
+    /**
+     * Наблюдение за состоянием доски (возвращает список ходов)
+     */
+    fun observeBoardState(sessionID: String): Flow<List<String?>> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    // Создаем массив из 9 элементов для доски 3x3
+                    val board = Array<String?>(9) { null }
+                    
+                    snapshot.children.forEach { child ->
+                        child.key?.toIntOrNull()?.let { index ->
+                            if (index in 1..9) {
+                                board[index - 1] = child.value.toString()
+                            }
+                        }
+                    }
+                    
+                    trySend(board.toList())
+                } catch (e: Exception) {
+                    println("observeBoardState error: $e")
+                    trySend(emptyList())
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                println("observeBoardState cancelled: ${error.message}")
+                trySend(emptyList())
+            }
+        }
+        
+        myRef.child("PlayerOnline").child(sessionID).addValueEventListener(listener)
+        
+        awaitClose {
+            myRef.child("PlayerOnline").child(sessionID).removeEventListener(listener)
+        }
+    }
+    
+    /**
+     * Получение текущего хода (чей сейчас ход)
+     */
+    suspend fun getCurrentTurn(sessionID: String): String {
+        return try {
+            // Логика определения текущего игрока может быть расширена
+            // Сейчас возвращаем заглушку - в реальном приложении нужно хранить turn в базе
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()
+            snapshot.value as? String ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+    
+    /**
+     * Получение первого игрока в сессии (для определения символа X/O)
+     */
+    suspend fun getFirstPlayer(sessionID: String): String {
+        return try {
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").get().await()
+            snapshot.value as? String ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+    
+    /**
+     * Наблюдение за выходом соперника
+     */
+    fun observeOpponentLeft(sessionID: String): Flow<Boolean> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    // Проверяем, существует ли节点 opponentLeft или аналогичный флаг
+                    val opponentLeftSnapshot = snapshot.child("opponentLeft")
+                    val hasLeft = opponentLeftSnapshot.exists() && opponentLeftSnapshot.value == true
+                    trySend(hasLeft)
+                } catch (e: Exception) {
+                    println("observeOpponentLeft error: $e")
+                    trySend(false)
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                println("observeOpponentLeft cancelled: ${error.message}")
+                trySend(false)
+            }
+        }
+        
+        myRef.child("PlayerOnline").child(sessionID).addValueEventListener(listener)
+        
+        awaitClose {
+            myRef.child("PlayerOnline").child(sessionID).removeEventListener(listener)
+        }
+    }
+    
+    /**
+     * Перезапуск игры (очистка доски)
+     */
+    suspend fun restartGame(sessionID: String) {
+        // Очищаем все ходы в сессии
+        myRef.child("PlayerOnline").child(sessionID).removeValue().await()
+        // Можно добавить установку флага currentTurn и firstPlayer заново
+    }
+    
+    /**
+     * Обновление состояния доски
+     */
+    suspend fun updateBoardState(sessionID: String, board: List<String>) {
+        // Обновляем каждый элемент доски
+        board.forEachIndexed { index, value ->
+            if (value.isNotEmpty()) {
+                myRef.child("PlayerOnline").child(sessionID).child((index + 1).toString()).setValue(value).await()
+            }
+        }
+    }
+    
+    /**
+     * Получение имен игроков из сессии
+     */
+    suspend fun getPlayerNames(sessionID: String): Pair<String, String> {
+        return try {
+            // В реальном приложении нужно хранить имена игроков в сессии
+            // Здесь заглушка - нужно доработать структуру данных
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).get().await()
+            // Извлекаем имена из sessionID (формат: player1player2)
+            // Это упрощенная логика, лучше хранить явно в базе
+            Pair("", "")
+        } catch (e: Exception) {
+            Pair("", "")
+        }
+    }
 }
