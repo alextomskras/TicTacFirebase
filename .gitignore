@@ -1,41 +1,35 @@
 ```
-# Compiled and build artifacts
-*.class
-*.dex
-*.so
-*.aar
-*.apk
-*.jar
-
 # Dependencies
-libs/
-build/
 .gradle/
-.externalNativeBuild/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
+build/
 
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
 
-# Editors
-.vscode/
+# Logs
+*.log
+
+# IDE
 .idea/
 *.iml
 *.iws
-*.ipr
+.vscode/
 
-# Android specific
-*.keystore
-local.properties
-captures/
-.externalNativeBuild/
-.intermediates/
-.profile/
-shaders/
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+*.apk
+*.aar
+*.so
+*.jar
+*.class
+
+# Generated files
+gen/
+out/
+bin/
 ```
