@@ -15,9 +15,9 @@ import com.example.tictacfirebase.R
 
 class Notifications {
 
-    private const val CHANNELSTRING = "TTTTTT"
+    private val CHANNELSTRING = "TTTTTT"
 
-    private const val NOTIFIYTAG = "new request"
+    private val NOTIFIYTAG = "new request"
     fun Notify(context: Context, message: String, number: Int) {
         val intent = Intent(context, LoginActivity::class.java)
         val channelId = CHANNELSTRING
