@@ -22,16 +22,16 @@ import java.util.*
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
-    val TAG = "FCM_Service"
+    private const val tag = "FCM_Service"
 
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
-        Log.d(TAG, "From: " + remoteMessage.from)
-        Log.d(TAG, "Notification Message Body: " + remoteMessage.notification?.body)
+        Log.d(tag, "From: " + remoteMessage.from)
+        Log.d(tag, "Notification Message Body: " + remoteMessage.notification?.body)
         
         if (remoteMessage.data.isNotEmpty()) {
-            Log.d(TAG, "Message data payload: " + remoteMessage.data)
+            Log.d(tag, "Message data payload: " + remoteMessage.data)
         }
         sendNotification(remoteMessage)
     }
@@ -42,9 +42,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val deviceToken = token
         Log.d("NEW_TOKEN", deviceToken)
 
-        if (token.isNotEmpty()) {
-            Log.d(TAG, "TOKEN_$token")
-            Toast.makeText(this, "New Token: ${token}", Toast.LENGTH_SHORT).show()
+        if (!token.isNullOrEmpty()) {
+            Log.d(tag, "TOKEN_$token")
+            Toast.makeText(this, "New Token: $token", Toast.LENGTH_SHORT).show()
             saveTokenToFirebaseDatabase(token)
         }
     }

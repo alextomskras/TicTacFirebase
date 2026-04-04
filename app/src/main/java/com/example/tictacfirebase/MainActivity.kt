@@ -32,7 +32,7 @@ import java.util.Random
 open class MainActivity : AppCompatActivity() {
 
     companion object {
-        val TAG = AppConstants.TAG
+        private const val tag = "TicTacFirebase"
         private const val SENDER_ID = "793202519353"
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
     }
@@ -94,7 +94,7 @@ open class MainActivity : AppCompatActivity() {
 
         val b: Bundle? = intent.extras
         myEmail = b?.getString(AppConstants.KEY_EMAIL)
-        Log.d(TAG, "getExtraEmail: $myEmail")
+        Log.d(tag, "getExtraEmail: $myEmail")
         supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
         
         // Обновляем статус подключения
@@ -192,7 +192,7 @@ open class MainActivity : AppCompatActivity() {
                 try {
                     // Слушаем запросы через Flow из ViewModel
                     gameViewModel.observeGameRequests(email.splitEmail()).collect { requesterEmail ->
-                        Log.d(TAG, "Incoming request from: $requesterEmail")
+                        Log.d(tag, "Incoming request from: $requesterEmail")
                         etEmail.setText(requesterEmail)
                         
                         // Отправляем уведомление (FCM)
@@ -212,7 +212,7 @@ open class MainActivity : AppCompatActivity() {
                         gameViewModel.clearGameRequest(email.splitEmail())
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error processing incoming request: ${e.message}")
+                    Log.e(tag, "Error processing incoming request: ${e.message}")
                     Toast.makeText(
                         this@MainActivity,
                         getString(R.string.error_processing_request, e.message),
@@ -270,7 +270,7 @@ open class MainActivity : AppCompatActivity() {
     private fun setupNetworkObserver() {
         lifecycleScope.launch {
             NetworkMonitor.observeNetworkConnectivity(this@MainActivity).collect { isOnline ->
-                Log.d(TAG, "Network status changed: isOnline=$isOnline")
+                Log.d(tag, "Network status changed: isOnline=$isOnline")
                 
                 // Обновляем текст статуса подключения
                 val statusText = if (isOnline) {
@@ -292,7 +292,7 @@ open class MainActivity : AppCompatActivity() {
     private fun refreshTokens(): String? {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
-                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                Log.w(tag, "Fetching FCM registration token failed", task.exception)
                 return@addOnCompleteListener
             }
             val newToken = task.result
@@ -306,7 +306,7 @@ open class MainActivity : AppCompatActivity() {
                         gameViewModel.updateUserToken(email.splitEmail(), newToken)
                         updateConnectionStatus(getString(R.string.connected))
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error updating token: ${e.message}")
+                        Log.e(tag, "Error updating token: ${e.message}")
                         updateConnectionStatus(getString(R.string.error_connection))
                     } finally {
                         showLoading(false)
@@ -380,7 +380,7 @@ open class MainActivity : AppCompatActivity() {
         return try {
             gameViewModel.getUserProfileImage(email)
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading avatar: ${e.message}")
+            Log.e(tag, "Error loading avatar: ${e.message}")
             null
         }
     }
@@ -404,14 +404,14 @@ open class MainActivity : AppCompatActivity() {
                 .setMessageId(random.nextInt(9999).toString())
                 .addData("TEST1-- $user", "TEST1--  $toId")
                 .build()
-        Log.e(TAG, "UpstreamData: $message")
+        Log.e(tag, "UpstreamData: $message")
 
         if (message.data.isNotEmpty()) {
-            Log.e(TAG, "UpstreamData: ${message.data}")
+            Log.e(tag, "UpstreamData: ${message.data}")
         }
 
-        if (message.messageId!!.isNotEmpty()) {
-            Log.e(TAG, "UpstreamMessageId: ${message.messageId}")
+        if (!message.messageId.isNullOrEmpty()) {
+            Log.e(tag, "UpstreamMessageId: ${message.messageId}")
         }
 
         @Suppress("DEPRECATION")
