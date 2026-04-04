@@ -21,6 +21,7 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import coil.load
+import com.example.tictacfirebase.model.UiEffect
 import kotlinx.coroutines.launch
 import java.util.Random
 
@@ -73,7 +74,7 @@ open class MainActivity : AppCompatActivity() {
         // Инициализация GameRepository для передачи в ViewModel
         val gameRepository = GameRepository()
         
-        //Hide img+player2name
+        //Hide img+player name
         player2TextView.visibility = View.GONE
         imageViewUser2.visibility = View.GONE
 
