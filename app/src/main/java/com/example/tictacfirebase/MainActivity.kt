@@ -195,7 +195,7 @@ open class MainActivity : AppCompatActivity() {
                         Log.d(tag, "Incoming request from: $requesterEmail")
                         etEmail.setText(requesterEmail)
                         
-                        // Отправляем уведомление (FCM)
+                        // Отправляем уведомление (FCM) - используем Firebase Messaging
                         performFcmSendMessages()
                         
                         // Активируем кнопку принятия запроса
