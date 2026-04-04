@@ -27,7 +27,7 @@ import java.util.*
 class registerActivity : AppCompatActivity() {
 
     companion object {
-        val TAG = "RegisterActivity"
+        private const val tag = "RegisterActivity"
 
     }
 
@@ -61,7 +61,7 @@ class registerActivity : AppCompatActivity() {
         }
 
         already_have_accaunt_text_view.setOnClickListener {
-            Log.d(TAG, "Try to show LoginActivity activity")
+            Log.d(tag, "Try to show LoginActivity activity")
 
             // launch the LoginActivity activity somehow
             val intent = Intent(this, LoginActivity::class.java)
@@ -70,7 +70,7 @@ class registerActivity : AppCompatActivity() {
         }
 
         select_photo_button_register.setOnClickListener {
-            Log.d(TAG, "Try to show photo selector")
+            Log.d(tag, "Try to show photo selector")
 
             val intent = Intent(Intent.ACTION_PICK)
             intent.type = "image/*"
@@ -85,7 +85,7 @@ class registerActivity : AppCompatActivity() {
 
         if (requestCode == 0 && resultCode == Activity.RESULT_OK && data != null) {
             // proceed and check what the selected image was....
-            Log.d(TAG, "Photo was selected")
+            Log.d(tag, "Photo was selected")
 
             selectedPhotoUri = data.data
 
@@ -109,7 +109,7 @@ class registerActivity : AppCompatActivity() {
             return
         }
 
-        Log.d(TAG, "Attempting to create user with email: $email")
+        Log.d(tag, "Attempting to create user with email: $email")
         
         register_progressBar.visibility = View.VISIBLE
 
@@ -120,13 +120,13 @@ class registerActivity : AppCompatActivity() {
 
                     // else if successful
                     val user = task.result?.user ?: return@addOnCompleteListener
-                    Log.d(TAG, "Successfully created user with uid: ${user.uid}")
+                    Log.d(tag, "Successfully created user with uid: ${user.uid}")
 
                     uploadImageToFirebaseStorage()
                 }
                 .addOnFailureListener {
                     register_progressBar.visibility = View.GONE
-                    Log.d(TAG, "Failed to create user: ${it.message}")
+                    Log.d(tag, "Failed to create user: ${it.message}")
                     Toast.makeText(this, "Failed to create user: ${it.message}", Toast.LENGTH_SHORT).show()
                 }
     }
@@ -143,22 +143,22 @@ class registerActivity : AppCompatActivity() {
         GlobalScope.launch(Dispatchers.IO) {
             ref.putFile(selectedPhotoUri!!)
                     .addOnSuccessListener {
-                        Log.d(TAG, "Successfully uploaded image: ${it.metadata?.path}")
+                        Log.d(tag, "Successfully uploaded image: ${it.metadata?.path}")
 
                         ref.downloadUrl.addOnSuccessListener {
-                            Log.d(TAG, "File Location: $it")
+                            Log.d(tag, "File Location: $it")
 
                             saveUserToFirebaseDatabase(it.toString())
                         }
                                 .addOnFailureListener {
                                     register_progressBar.visibility = View.GONE
-                                    Log.d(TAG, "Failed to get download url: ${it.message}")
+                                    Log.d(tag, "Failed to get download url: ${it.message}")
                                     Toast.makeText(this@registerActivity, "Failed to get image URL", Toast.LENGTH_SHORT).show()
                                 }
                     }
                     .addOnFailureListener {
                         register_progressBar.visibility = View.GONE
-                        Log.d(TAG, "Failed to upload image to storage: ${it.message}")
+                        Log.d(tag, "Failed to upload image to storage: ${it.message}")
                         Toast.makeText(this@registerActivity, "Failed to upload image", Toast.LENGTH_SHORT).show()
                     }
         }
@@ -180,13 +180,13 @@ class registerActivity : AppCompatActivity() {
 
         ref.setValue(user)
                 .addOnSuccessListener {
-                    Log.d(TAG, "Finally we saved the user to Firebase Database")
+                    Log.d(tag, "Finally we saved the user to Firebase Database")
 
                     val intent = Intent(this, MainActivity::class.java)
                     intent.putExtra("email", email.toString().trim())
-                    Log.d(TAG, "putExtraEmail: $email")
+                    Log.d(tag, "putExtraEmail: $email")
                     intent.putExtra("uid", uid)
-                    Log.d(TAG, "putExtraUid: ${uid}")
+                    Log.d(tag, "putExtraUid: ${uid}")
                     intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
 //                refreshTokens()
                     register_progressBar.visibility = View.GONE
@@ -195,7 +195,7 @@ class registerActivity : AppCompatActivity() {
                 }
                 .addOnFailureListener {
                     register_progressBar.visibility = View.GONE
-                    Log.d(TAG, "Failed to set value to database: ${it.message}")
+                    Log.d(tag, "Failed to set value to database: ${it.message}")
                 }
     }
 
@@ -207,7 +207,7 @@ class registerActivity : AppCompatActivity() {
     private fun refreshTokens(): String? {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
-                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                Log.w(tag, "Fetching FCM registration token failed", task.exception)
                 return@addOnCompleteListener
             }
             val newToken = task.result

@@ -9,14 +9,14 @@ import com.google.firebase.messaging.FirebaseMessagingService
 
 
 class MyFirebaseInstanceIDService : FirebaseMessagingService() {
-    val TAG = "NEW_TOKEN"
+    private const val tag = "NEW_TOKEN"
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d("NEW_TOKEN", token)
 
-        if (token.isNotEmpty()) {
-            Log.d(TAG, "TOKEN_$token")
+        if (!token.isNullOrEmpty()) {
+            Log.d(tag, "TOKEN_$token")
             Toast.makeText(this, "New Token: $token", Toast.LENGTH_SHORT).show()
 
             if (FirebaseAuth.getInstance().currentUser != null)
