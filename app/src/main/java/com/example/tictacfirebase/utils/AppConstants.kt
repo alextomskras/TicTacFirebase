@@ -4,7 +4,7 @@ package com.example.tictacfirebase.utils
  * Объект с утилитами и константами для приложения
  */
 object AppConstants {
-    const val TAG = "TicTacFirebase"
+    private const val tag = "TicTacFirebase"
     
     // Ключи для Bundle и Intent
     const val KEY_EMAIL = "email"

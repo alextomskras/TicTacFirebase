@@ -1,61 +1,48 @@
+```
+# Compiled/Binary files
 *.class
-*.jar
-*.war
-*.aar
-*.so
-*.dll
-*.dylib
-*.exe
 *.o
 *.obj
 *.out
 
-# Build system
-build/
-.gradle/
-target/
-
 # Dependencies
-libs/
-vendor/
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
 
-# IDE
-.idea/
-*.iml
-*.ipr
-*.iws
+# Build artifacts
+build/
+dist/
+
+# Editor/IDE files
 .vscode/
-
-# Temp files
+.idea/
+*.swp
+*.swo
 *.tmp
-*.temp
+
+# Logs
 *.log
+
+# System files
 .DS_Store
 Thumbs.db
-*.swp
-*.lock
-
-# Configuration
-local.properties
-gradle.properties
-*.properties
-
-# Android specific
-*.apk
-*.aab
-*.dex
-proguard/
-.release
-.debug
-
-# Kotlin
-kotlin/
-*.kotlin_metadata
-
-# Firebase
-google-services.json
-
-# Environment
 .env
 .env.local
 *.env.*
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Android/Kotlin specific
+*.apk
+*.aar
+local.properties
+```

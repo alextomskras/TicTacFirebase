@@ -14,7 +14,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 
 class LoginActivity : AppCompatActivity() {
     companion object {
-        val TAG = "LoginActivity"
+        private const val tag = "LoginActivity"
     }
     
     private lateinit var binding: ActivityLoginBinding
@@ -48,10 +48,10 @@ class LoginActivity : AppCompatActivity() {
 //        val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
 //        ref.setValue(newTokens)
 //            .addOnSuccessListener {
-//                Log.d(TAG, "Finally we saved the user to Firebase Database")
+//                Log.d(tag, "Finally we saved the user to Firebase Database")
 //            }
 //            .addOnFailureListener {
-//                Log.d(TAG, "Failed to set value to database: ${it.message}")
+//                Log.d(tag, "Failed to set value to database: ${it.message}")
 //            }
 
         if (email.isEmpty() || password.isEmpty()) {
@@ -68,9 +68,9 @@ class LoginActivity : AppCompatActivity() {
 
                 val intent = Intent(this, MainActivity::class.java)
                 intent.putExtra("email", it.result?.user!!.email)
-                Log.d(TAG, "putExtraEmail: ${it.result?.user!!.email}")
+                Log.d(tag, "putExtraEmail: ${it.result?.user!!.email}")
                 intent.putExtra("uid", it.result?.user!!.uid)
-                Log.d(TAG, "putExtraUid: ${it.result?.user!!.uid}")
+                Log.d(tag, "putExtraUid: ${it.result?.user!!.uid}")
 
                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
                 binding.loginProgressBar.visibility = View.GONE
@@ -85,7 +85,7 @@ class LoginActivity : AppCompatActivity() {
     private fun refreshTokens(stripEmail: String) {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
-                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                Log.w(tag, "Fetching FCM registration token failed", task.exception)
                 return@addOnCompleteListener
             }
             val newToken = task.result
@@ -97,10 +97,10 @@ class LoginActivity : AppCompatActivity() {
                 val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
                 ref.setValue(newToken)
                     .addOnSuccessListener {
-                        Log.d(TAG, "Finally we saved the Token to Firebase Database")
+                        Log.d(tag, "Finally we saved the Token to Firebase Database")
                     }
                     .addOnFailureListener {
-                        Log.d(TAG, "Failed to set value to database: ${it.message}")
+                        Log.d(tag, "Failed to set value to database: ${it.message}")
                     }
 
             }
