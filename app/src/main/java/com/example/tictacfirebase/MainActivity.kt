@@ -11,7 +11,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
-import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.example.tictacfirebase.utils.AppConstants
 import com.example.tictacfirebase.utils.NetworkMonitor
 import com.example.tictacfirebase.utils.splitEmail
@@ -22,22 +21,20 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import coil.load
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Random
 
 open class MainActivity : AppCompatActivity() {
 
     companion object {
         val TAG = AppConstants.TAG
+        private const val SENDER_ID = "793202519353"
     }
 
-    private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
     var myEmail: String? = null
 
-    lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
     
     // UI Views
@@ -49,36 +46,36 @@ open class MainActivity : AppCompatActivity() {
     private lateinit var gameViewModel: GameViewModel
     
     // Image views
-    private val image_View_user2 by lazy { findViewById<de.hdodenhof.circleimageview.CircleImageView>(com.example.tictacfirebase.R.id.image_View_user2) }
-    private val player2_text_View by lazy { findViewById<android.widget.TextView>(com.example.tictacfirebase.R.id.player2_text_View) }
-    private val buAcceptEvent by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.buAcceptEvent) }
-    private val burequest by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.burequest) }
-    private val etEmail by lazy { findViewById<android.widget.EditText>(com.example.tictacfirebase.R.id.etEmail) }
-    private val bu1 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu1) }
-    private val bu2 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu2) }
-    private val bu3 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu3) }
-    private val bu4 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu4) }
-    private val bu5 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu5) }
-    private val bu6 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu6) }
-    private val bu7 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu7) }
-    private val bu8 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu8) }
-    private val bu9 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu9) }
+    private val imageViewUser2 by lazy { findViewById<de.hdodenhof.circleimageview.CircleImageView>(R.id.image_View_user2) }
+    private val player2TextView by lazy { findViewById<android.widget.TextView>(R.id.player2_text_View) }
+    private val buAcceptEvent by lazy { findViewById<Button>(R.id.buAcceptEvent) }
+    private val buRequest by lazy { findViewById<Button>(R.id.burequest) }
+    private val etEmail by lazy { findViewById<android.widget.EditText>(R.id.etEmail) }
+    private val bu1 by lazy { findViewById<Button>(R.id.bu1) }
+    private val bu2 by lazy { findViewById<Button>(R.id.bu2) }
+    private val bu3 by lazy { findViewById<Button>(R.id.bu3) }
+    private val bu4 by lazy { findViewById<Button>(R.id.bu4) }
+    private val bu5 by lazy { findViewById<Button>(R.id.bu5) }
+    private val bu6 by lazy { findViewById<Button>(R.id.bu6) }
+    private val bu7 by lazy { findViewById<Button>(R.id.bu7) }
+    private val bu8 by lazy { findViewById<Button>(R.id.bu8) }
+    private val bu9 by lazy { findViewById<Button>(R.id.bu9) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
         // Инициализация UI элементов
-        progressBar = findViewById(com.example.tictacfirebase.R.id.progressBar)
-        tvConnectionStatus = findViewById(com.example.tictacfirebase.R.id.tvConnectionStatus)
-        noInternetOverlay = findViewById(com.example.tictacfirebase.R.id.noInternetOverlay)
+        progressBar = findViewById(R.id.progressBar)
+        tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
+        noInternetOverlay = findViewById(R.id.noInternetOverlay)
         
         // Инициализация GameRepository для передачи в ViewModel
         val gameRepository = GameRepository()
         
         //Hide img+player2name
-        player2_text_View.visibility = View.GONE
-        image_View_user2.visibility = View.GONE
+        player2TextView.visibility = View.GONE
+        imageViewUser2.visibility = View.GONE
 
         //Block_ACCEPT_BUTTON
         buAcceptEvent.isEnabled = false
@@ -87,7 +84,6 @@ open class MainActivity : AppCompatActivity() {
 
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
-        val channelId = getString(R.string.default_notification_channel_id)
         val b: Bundle? = intent.extras
         myEmail = b?.getString(AppConstants.KEY_EMAIL)
         Log.d(TAG, "getExtraEmail: $myEmail")
@@ -120,13 +116,13 @@ open class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             gameViewModel.uiEffect.collect { effect ->
                 when (effect) {
-                    is com.example.tictacfirebase.model.UiEffect.ShowToast -> {
+                    is UiEffect.ShowToast -> {
                         Toast.makeText(this@MainActivity, effect.message, Toast.LENGTH_SHORT).show()
                     }
-                    is com.example.tictacfirebase.model.UiEffect.NavigateTo -> {
+                    is UiEffect.NavigateTo -> {
                         // TODO: Реализовать навигацию
                     }
-                    com.example.tictacfirebase.model.UiEffect.GameEnded -> {
+                    UiEffect.GameEnded -> {
                         // TODO: Показать диалог конца игры
                     }
                     else -> {}
@@ -149,7 +145,7 @@ open class MainActivity : AppCompatActivity() {
                         etEmail.setText(requesterEmail)
                         
                         // Отправляем уведомление (FCM)
-                        perfotmFCMSendMessages()
+                        performFcmSendMessages()
                         
                         // Активируем кнопку принятия запроса
                         buAcceptEvent.isEnabled = true
@@ -157,7 +153,7 @@ open class MainActivity : AppCompatActivity() {
                         
                         Toast.makeText(
                             this@MainActivity,
-                            "Игрок $requesterEmail хочет сыграть!",
+                            getString(R.string.incoming_request_message, requesterEmail),
                             Toast.LENGTH_LONG
                         ).show()
                         
@@ -168,7 +164,7 @@ open class MainActivity : AppCompatActivity() {
                     Log.e(TAG, "Error processing incoming request: ${e.message}")
                     Toast.makeText(
                         this@MainActivity,
-                        "Ошибка обработки запроса: ${e.message}",
+                        getString(R.string.error_processing_request, e.message),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -211,7 +207,7 @@ open class MainActivity : AppCompatActivity() {
         bu7.isEnabled = !show
         bu8.isEnabled = !show
         bu9.isEnabled = !show
-        burequest.isEnabled = !show
+        buRequest.isEnabled = !show
         buAcceptEvent.isEnabled = !show && buAcceptEvent.tag == "enabled"
         etEmail.isEnabled = !show
     }
@@ -274,33 +270,33 @@ open class MainActivity : AppCompatActivity() {
         val buSelected = view as Button
         var cellID = 0
         when (buSelected.id) {
-            com.example.tictacfirebase.R.id.bu1 -> cellID = AppConstants.CellIds.CELL_1
-            com.example.tictacfirebase.R.id.bu2 -> cellID = AppConstants.CellIds.CELL_2
-            com.example.tictacfirebase.R.id.bu3 -> cellID = AppConstants.CellIds.CELL_3
-            com.example.tictacfirebase.R.id.bu4 -> cellID = AppConstants.CellIds.CELL_4
-            com.example.tictacfirebase.R.id.bu5 -> cellID = AppConstants.CellIds.CELL_5
-            com.example.tictacfirebase.R.id.bu6 -> cellID = AppConstants.CellIds.CELL_6
-            com.example.tictacfirebase.R.id.bu7 -> cellID = AppConstants.CellIds.CELL_7
-            com.example.tictacfirebase.R.id.bu8 -> cellID = AppConstants.CellIds.CELL_8
-            com.example.tictacfirebase.R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
+            R.id.bu1 -> cellID = AppConstants.CellIds.CELL_1
+            R.id.bu2 -> cellID = AppConstants.CellIds.CELL_2
+            R.id.bu3 -> cellID = AppConstants.CellIds.CELL_3
+            R.id.bu4 -> cellID = AppConstants.CellIds.CELL_4
+            R.id.bu5 -> cellID = AppConstants.CellIds.CELL_5
+            R.id.bu6 -> cellID = AppConstants.CellIds.CELL_6
+            R.id.bu7 -> cellID = AppConstants.CellIds.CELL_7
+            R.id.bu8 -> cellID = AppConstants.CellIds.CELL_8
+            R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
         }
         
         // Отправляем событие в ViewModel для обработки хода
-        gameViewModel.onEvent(com.example.tictacfirebase.model.UiEvent.CellSelected(cellID))
+        gameViewModel.onEvent(UiEvent.CellSelected(cellID))
     }
 
     fun buRequestEvent(view: View) {
         val userDemail = etEmail.text.toString()
         
         //unHide player2 icon
-        player2_text_View.visibility = View.VISIBLE
-        image_View_user2.visibility = View.VISIBLE
-        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+        player2TextView.visibility = View.VISIBLE
+        imageViewUser2.visibility = View.VISIBLE
+        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
 
         // Загружаем аватар противника
         lifecycleScope.launch {
             val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-            image_View_user2.load(opponentAvatarUrl)
+            imageViewUser2.load(opponentAvatarUrl)
         }
 
         // Отправляем событие в ViewModel
@@ -312,14 +308,14 @@ open class MainActivity : AppCompatActivity() {
         val userDemail = etEmail.text.toString()
         
         //unHide player2 icon
-        player2_text_View.visibility = View.VISIBLE
-        image_View_user2.visibility = View.VISIBLE
-        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+        player2TextView.visibility = View.VISIBLE
+        imageViewUser2.visibility = View.VISIBLE
+        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
         
         // Загружаем аватар противника
         lifecycleScope.launch {
             val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-            image_View_user2.load(opponentAvatarUrl)
+            imageViewUser2.load(opponentAvatarUrl)
         }
 
         // Отправляем событие в ViewModel
@@ -349,37 +345,30 @@ open class MainActivity : AppCompatActivity() {
         restartGame()
     }
 
-        fun perfotmFCMSendMessages() {
-//        val fromId = FirebaseAuth.getInstance().uid
-//        val user = intent.getParcelableExtra<User>(NewMessageActivity.USER_KEY)
+    private fun performFcmSendMessages() {
         val user = myEmail
         val toId = user
-//        btn_upmessage.setOnClickListener {
         val fm = FirebaseMessaging.getInstance()
-//793202519353@gcm.googleapis.com
-        val message = RemoteMessage.Builder(SENDER_ID + "@fcm.googleapis.com")
-
-                .setMessageId(Integer.toString(random.nextInt(9999)))
+        val message = RemoteMessage.Builder("$SENDER_ID@fcm.googleapis.com")
+                .setMessageId(random.nextInt(9999).toString())
                 .addData("TEST1-- $user", "TEST1--  $toId")
-//                    .addData(edt_key1.text.toString(), edt_value1.text.toString())
-//                    .addData(edt_key2.text.toString(), edt_value2.text.toString())
                 .build()
-        Log.e(TAG, "UpstreamData: " + message)
+        Log.e(TAG, "UpstreamData: $message")
 
-        if (!message.data.isEmpty()) {
-            Log.e(TAG, "UpstreamData: " + message.data)
+        if (message.data.isNotEmpty()) {
+            Log.e(TAG, "UpstreamData: ${message.data}")
         }
 
-        if (!message.messageId!!.isEmpty()) {
-            Log.e(TAG, "UpstreamMessageId: " + message.messageId)
+        if (message.messageId!!.isNotEmpty()) {
+            Log.e(TAG, "UpstreamMessageId: ${message.messageId}")
         }
 
+        @Suppress("DEPRECATION")
         fm.send(message)
-//        }
     }
 
     fun restartGame() {
-        Toast.makeText(this, " RESTART the game", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_LONG).show()
     }
 
 

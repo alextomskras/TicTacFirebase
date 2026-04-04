@@ -40,6 +40,8 @@ sealed class UiEvent {
     object RestartGameClicked : UiEvent()
     data class JoinWithCode(val code: String) : UiEvent()
     data class CellSelected(val cellIndex: Int) : UiEvent()
+    data class SendGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
+    data class AcceptGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
 }
 
 /**
