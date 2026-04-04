@@ -1,5 +1,6 @@
 package com.example.tictacfirebase.repository
 
+import android.util.Log
 import com.example.tictacfirebase.utils.Result
 import com.example.tictacfirebase.utils.runCatchingResult
 import com.google.firebase.database.DataSnapshot
@@ -31,11 +32,48 @@ class GameRepository {
     
     /**
      * Отправка запроса на игру другому пользователю
+     * Получает токен получателя из БД и сохраняет данные для отправки FCM
+     * 
+     * ВАЖНО: Прямая отправка FCM на токен получателя невозможна с клиента без сервера.
+     * Для реальной отправки уведомлений нужно использовать:
+     * 1. Firebase Cloud Functions - триггер на запись в БД (рекомендуется)
+     * 2. Firebase Admin SDK на бэкенде
+     * 3. HTTP v1 API с сервисным аккаунтом (требует серверной авторизации)
+     * 
+     * В данном примере мы сохраняем запрос в БД, а Cloud Function должен отправить FCM
      */
     suspend fun sendGameRequest(fromUser: String, toUser: String): Result<Unit> {
         return runCatchingResult {
             val splitToUser = toUser.substringBefore("@")
+            
+            // Проверяем существование пользователя и получаем его токен
+            val tokenSnapshot = myRef.child("users").child(splitToUser).child("newToken").get().await()
+            val recipientToken = tokenSnapshot.value as? String
+            
+            if (recipientToken == null) {
+                Log.w("GameRepository", "Token not found for user: $splitToUser. User may not be online or registered.")
+            } else {
+                Log.d("GameRepository", "Found token for user $splitToUser, will send FCM via Cloud Function")
+            }
+            
+            // Сохраняем запрос в БД
+            // Cloud Function должен следить за изменениями в /users/{userId}/request/
+            // и отправлять FCM уведомление при появлении нового запроса
             myRef.child("users").child(splitToUser).child("request").push().setValue(fromUser).await()
+            
+            // Также сохраняем данные для FCM в отдельном узле для Cloud Function
+            if (recipientToken != null) {
+                val fcmData = mapOf(
+                    "fromUser" to fromUser,
+                    "toUser" to toUser,
+                    "token" to recipientToken,
+                    "title" to "Запрос на игру",
+                    "body" to "$fromUser приглашает вас сыграть в крестики-нолики!",
+                    "timestamp" to System.currentTimeMillis()
+                )
+                myRef.child("fcm_queue").push().setValue(fcmData).await()
+                Log.d("GameRepository", "FCM data saved to queue for Cloud Function processing")
+            }
         }
     }
     
