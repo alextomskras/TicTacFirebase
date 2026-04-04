@@ -88,8 +88,8 @@ open class MainActivity : AppCompatActivity() {
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
         val channelId = getString(R.string.default_notification_channel_id)
-        val b: Bundle = intent.extras
-        myEmail = b.getString(AppConstants.KEY_EMAIL)
+        val b: Bundle? = intent.extras
+        myEmail = b?.getString(AppConstants.KEY_EMAIL)
         Log.d(TAG, "getExtraEmail: $myEmail")
         supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
         
