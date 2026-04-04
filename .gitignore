@@ -1,35 +1,60 @@
-```
-# Dependencies
+# Android generated files
 .gradle/
 build/
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Logs
-*.log
-
-# IDE
 .idea/
 *.iml
 *.iws
-.vscode/
+local.properties
+captures/
+.externalNativeBuild/
 
-# OS
+# Kotlin
+.kotlin/
+
+# Firebase sensitive files (ВАЖНО!)
+google-services.json
+GoogleService-Info.plist
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Keystore files (подписи приложения)
+*.jks
+*.keystore
+*.pem
+*.pk8
+debug.keystore
+
+# API keys and secrets
+secrets.properties
+secrets.gradle
+api_keys.xml
+app/src/debug/res/values/secrets.xml
+app/src/release/res/values/secrets.xml
+
+# CI/CD
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+
+# Mac/Windows/Linux
 .DS_Store
 Thumbs.db
+*.swp
+*.lock
 
-# Build outputs
+# Logs and outputs
+*.log
 *.apk
-*.aar
-*.so
-*.jar
+*.aab
+*.dex
 *.class
+*.jar
 
-# Generated files
-gen/
-out/
-bin/
-```
+# Backup files
+*.backup
+*.bak
