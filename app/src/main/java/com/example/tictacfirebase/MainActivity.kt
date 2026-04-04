@@ -195,8 +195,8 @@ open class MainActivity : AppCompatActivity() {
                         Log.d(tag, "Incoming request from: $requesterEmail")
                         etEmail.setText(requesterEmail)
                         
-                        // Отправляем уведомление (FCM) - используем Firebase Messaging
-                        performFcmSendMessages()
+                        // FCM уведомление уже было отправлено отправителем запроса в sendGameRequest()
+                        // Здесь просто показываем UI и toast
                         
                         // Активируем кнопку принятия запроса
                         buAcceptEvent.isEnabled = true
