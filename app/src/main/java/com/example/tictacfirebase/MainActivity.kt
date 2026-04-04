@@ -1,6 +1,10 @@
 package com.example.tictacfirebase
 
-
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -30,6 +34,7 @@ open class MainActivity : AppCompatActivity() {
     companion object {
         val TAG = AppConstants.TAG
         private const val SENDER_ID = "793202519353"
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
     }
 
     private val random = Random()
@@ -65,7 +70,9 @@ open class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        
+
+        // Запрос разрешения на уведомления для Android 13+
+        requestNotificationPermission()
         // Инициализация UI элементов
         progressBar = findViewById(R.id.progressBar)
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
@@ -108,7 +115,50 @@ open class MainActivity : AppCompatActivity() {
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
     }
-    
+
+    /**
+     * Запрос разрешения на отправку уведомлений для Android 13+ (API 33+)
+     */
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+                Log.d(TAG, "Notification permission requested")
+            } else {
+                Log.d(TAG, "Notification permission already granted")
+            }
+        } else {
+            Log.d(TAG, "Android version < 13, notification permission not required")
+        }
+    }
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Notification permission granted")
+                Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.d(TAG, "Notification permission denied")
+                Toast.makeText(
+                    this,
+                    "Notifications disabled - you won't receive game requests",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
     /**
      * Настройка наблюдения за UI эффектами от ViewModel
      * Показывает toast сообщения и обрабатывает навигацию
