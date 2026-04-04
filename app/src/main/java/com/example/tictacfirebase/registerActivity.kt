@@ -7,6 +7,9 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.tictacfirebase.models.User
@@ -15,6 +18,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.FirebaseStorage
+import de.hdodenhof.circleimageview.CircleImageView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -27,10 +31,28 @@ class registerActivity : AppCompatActivity() {
 
     }
 
+    private lateinit var register_progressBar: ProgressBar
+    private lateinit var register_button_register: Button
+    private lateinit var already_have_accaunt_text_view: android.widget.TextView
+    private lateinit var select_photo_button_register: Button
+    private lateinit var select_photoview_register: CircleImageView
+    private lateinit var email_edittext_register: EditText
+    private lateinit var password_edittext_register: EditText
+    private lateinit var username_edittext_register: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
+        
+        register_progressBar = findViewById(R.id.register_progressBar)
+        register_button_register = findViewById(R.id.register_button_register)
+        already_have_accaunt_text_view = findViewById(R.id.already_have_accaunt_text_view)
+        select_photo_button_register = findViewById(R.id.select_photo_button_register)
+        select_photoview_register = findViewById(R.id.select_photoview_register)
+        email_edittext_register = findViewById(R.id.email_edittext_register)
+        password_edittext_register = findViewById(R.id.password_edittext_register)
+        username_edittext_register = findViewById(R.id.username_edittext_register)
+        
         register_progressBar.scaleY = 4f
         register_progressBar.visibility = View.GONE
 
@@ -92,11 +114,12 @@ class registerActivity : AppCompatActivity() {
 
         // Firebase Authentication to create a user with email and password
         FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, password)
-                .addOnCompleteListener {
-                    if (!it.isSuccessful) return@addOnCompleteListener
+                .addOnCompleteListener { task ->
+                    if (!task.isSuccessful) return@addOnCompleteListener
 
                     // else if successful
-                    Log.d(TAG, "Successfully created user with uid: ${it.result!!.user.uid}")
+                    val user = task.result?.user ?: return@addOnCompleteListener
+                    Log.d(TAG, "Successfully created user with uid: ${user.uid}")
 
                     uploadImageToFirebaseStorage()
                 }
