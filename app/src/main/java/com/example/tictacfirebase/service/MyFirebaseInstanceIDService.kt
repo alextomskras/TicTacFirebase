@@ -9,7 +9,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 
 
 class MyFirebaseInstanceIDService : FirebaseMessagingService() {
-    private const val tag = "NEW_TOKEN"
+    private val tag = "NEW_TOKEN"
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)

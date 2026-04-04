@@ -22,7 +22,7 @@ import java.util.*
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
-    private const val tag = "FCM_Service"
+    private val tag = "FCM_Service"
 
 
     @RequiresApi(Build.VERSION_CODES.O)
