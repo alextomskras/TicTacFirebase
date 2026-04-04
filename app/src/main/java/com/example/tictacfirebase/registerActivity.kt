@@ -57,7 +57,6 @@ class registerActivity : AppCompatActivity() {
         register_progressBar.visibility = View.GONE
 
         register_button_register.setOnClickListener {
-            register_progressBar.visibility = View.VISIBLE
             performRegister()
         }
 
@@ -111,6 +110,8 @@ class registerActivity : AppCompatActivity() {
         }
 
         Log.d(TAG, "Attempting to create user with email: $email")
+        
+        register_progressBar.visibility = View.VISIBLE
 
         // Firebase Authentication to create a user with email and password
         FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, password)
@@ -131,7 +132,11 @@ class registerActivity : AppCompatActivity() {
     }
 
     private fun uploadImageToFirebaseStorage() {
-        if (selectedPhotoUri == null) return
+        if (selectedPhotoUri == null) {
+            // No photo selected, proceed directly to save user
+            saveUserToFirebaseDatabase("")
+            return
+        }
 
         val filename = UUID.randomUUID().toString()
         val ref = FirebaseStorage.getInstance().getReference("/images/$filename")
@@ -145,10 +150,16 @@ class registerActivity : AppCompatActivity() {
 
                             saveUserToFirebaseDatabase(it.toString())
                         }
+                                .addOnFailureListener {
+                                    register_progressBar.visibility = View.GONE
+                                    Log.d(TAG, "Failed to get download url: ${it.message}")
+                                    Toast.makeText(this@registerActivity, "Failed to get image URL", Toast.LENGTH_SHORT).show()
+                                }
                     }
                     .addOnFailureListener {
                         register_progressBar.visibility = View.GONE
                         Log.d(TAG, "Failed to upload image to storage: ${it.message}")
+                        Toast.makeText(this@registerActivity, "Failed to upload image", Toast.LENGTH_SHORT).show()
                     }
         }
     }

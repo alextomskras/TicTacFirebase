@@ -1,35 +1,59 @@
-```
-# Dependencies
-.gradle/
+*.class
+*.jar
+*.war
+*.aar
+*.so
+*.dll
+*.dylib
+*.exe
+*.o
+*.obj
+*.out
+
+# Build system
 build/
+.gradle/
+target/
+
+# Dependencies
+libs/
+vendor/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Temp files
+*.tmp
+*.temp
+*.log
+.DS_Store
+Thumbs.db
+
+# Configuration
+local.properties
+gradle.properties
+*.properties
+
+# Android specific
+*.apk
+*.aab
+*.dex
+proguard/
+.release
+.debug
+
+# Kotlin
+kotlin/
+*.kotlin_metadata
+
+# Firebase
+google-services.json
 
 # Environment
 .env
 .env.local
 *.env.*
-
-# Logs
-*.log
-
-# IDE
-.idea/
-*.iml
-*.iws
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build outputs
-*.apk
-*.aar
-*.so
-*.jar
-*.class
-
-# Generated files
-gen/
-out/
-bin/
-```
