@@ -106,17 +106,21 @@ class registerActivity : AppCompatActivity() {
 
         if (email.isEmpty() || password.isEmpty()) {
             Toast.makeText(this, "Please enter text in email/pw", Toast.LENGTH_SHORT).show()
+            hideLoading()
             return
         }
 
         Log.d(tag, "Attempting to create user with email: $email")
         
-        register_progressBar.visibility = View.VISIBLE
+        showLoading()
 
         // Firebase Authentication to create a user with email and password
         FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener { task ->
-                    if (!task.isSuccessful) return@addOnCompleteListener
+                    if (!task.isSuccessful) {
+                        hideLoading()
+                        return@addOnCompleteListener
+                    }
 
                     // else if successful
                     val user = task.result?.user ?: return@addOnCompleteListener
@@ -125,7 +129,7 @@ class registerActivity : AppCompatActivity() {
                     uploadImageToFirebaseStorage()
                 }
                 .addOnFailureListener {
-                    register_progressBar.visibility = View.GONE
+                    hideLoading()
                     Log.d(tag, "Failed to create user: ${it.message}")
                     Toast.makeText(this, "Failed to create user: ${it.message}", Toast.LENGTH_SHORT).show()
                 }
@@ -151,13 +155,13 @@ class registerActivity : AppCompatActivity() {
                             saveUserToFirebaseDatabase(it.toString())
                         }
                                 .addOnFailureListener {
-                                    register_progressBar.visibility = View.GONE
+                                    hideLoading()
                                     Log.d(tag, "Failed to get download url: ${it.message}")
                                     Toast.makeText(this@registerActivity, "Failed to get image URL", Toast.LENGTH_SHORT).show()
                                 }
                     }
                     .addOnFailureListener {
-                        register_progressBar.visibility = View.GONE
+                        hideLoading()
                         Log.d(tag, "Failed to upload image to storage: ${it.message}")
                         Toast.makeText(this@registerActivity, "Failed to upload image", Toast.LENGTH_SHORT).show()
                     }
@@ -189,14 +193,28 @@ class registerActivity : AppCompatActivity() {
                     Log.d(tag, "putExtraUid: ${uid}")
                     intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
 //                refreshTokens()
-                    register_progressBar.visibility = View.GONE
+                    hideLoading()
                     startActivity(intent)
 
                 }
                 .addOnFailureListener {
-                    register_progressBar.visibility = View.GONE
+                    hideLoading()
                     Log.d(tag, "Failed to set value to database: ${it.message}")
                 }
+    }
+
+    /**
+     * Показать индикатор загрузки
+     */
+    private fun showLoading() {
+        register_progressBar.visibility = View.VISIBLE
+    }
+
+    /**
+     * Скрыть индикатор загрузки
+     */
+    private fun hideLoading() {
+        register_progressBar.visibility = View.GONE
     }
 
     fun SplitString(str: String): String {
