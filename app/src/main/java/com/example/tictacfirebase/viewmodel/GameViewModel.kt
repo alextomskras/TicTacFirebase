@@ -302,19 +302,21 @@ class GameViewModel(
                     
                     if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
                         // Обновляем sessionId в состоянии
+                        // toEmail - это текущий пользователь (который принял запрос)
+                        // fromEmail - это соперник (который отправил запрос)
                         updateState { 
                             copy(
                                 sessionId = sessionId,
-                                currentPlayerName = fromEmail,
-                                opponentName = toEmail,
-                                isMyTurn = true,
+                                currentPlayerName = toEmail,  // Текущий пользователь
+                                opponentName = fromEmail,     // Соперник
+                                isMyTurn = false,             // Отправитель ходит первым
                                 gameStatus = GameStatus.Playing
                             ) 
                         }
                         
                         // Загружаем аватарки
-                        val myAvatarResult = gameRepository.getUserProfileImage(fromEmail)
-                        val opponentAvatarResult = gameRepository.getUserProfileImage(toEmail)
+                        val myAvatarResult = gameRepository.getUserProfileImage(toEmail)
+                        val opponentAvatarResult = gameRepository.getUserProfileImage(fromEmail)
                         
                         val myAvatar = if (myAvatarResult is com.example.tictacfirebase.utils.Result.Success) myAvatarResult.data else null
                         val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
@@ -326,7 +328,7 @@ class GameViewModel(
                             )
                         }
                         
-                        sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите первым (X)"))
+                        sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите вторым (O)"))
                     } else if (setupResult is com.example.tictacfirebase.utils.Result.Error) {
                         val errorMessage = setupResult.message ?: setupResult.exception.message ?: "Неизвестная ошибка"
                         sendEffect(UiEffect.ShowToast("Ошибка настройки игры: $errorMessage"))
