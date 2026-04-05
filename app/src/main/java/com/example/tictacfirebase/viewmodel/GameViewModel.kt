@@ -376,27 +376,31 @@ class GameViewModel(
                 return@launch
             }
 
-            val board = currentState.boardState.toMutableList()
+            // Проверяем занята ли клетка в локальном состоянии
+            val board = currentState.boardState
+            if (cellIndex < 0 || cellIndex >= board.size) {
+                sendEffect(UiEffect.ShowToast("Неверный индекс клетки"))
+                return@launch
+            }
+            
             if (board[cellIndex].isNotEmpty()) {
                 sendEffect(UiEffect.ShowToast("Клетка занята"))
                 return@launch // Клетка занята
             }
 
             // Определяем мой символ
-            val mySymbolResult = gameRepository.getFirstPlayer(gameId)
-            val firstPlayer = if (mySymbolResult is com.example.tictacfirebase.utils.Result.Success) mySymbolResult.data else ""
+            val firstPlayerResult = gameRepository.getFirstPlayer(gameId)
+            val firstPlayer = if (firstPlayerResult is com.example.tictacfirebase.utils.Result.Success) firstPlayerResult.data else ""
             val mySymbol = if (currentState.currentPlayerName == firstPlayer) "X" else "O"
 
-            board[cellIndex] = mySymbol
+            // Отправляем ход на сервер (один атомарный вызов)
+            val moveResult = gameRepository.makeMove(gameId, cellIndex, currentState.currentPlayerName, mySymbol)
             
-            // Отправляем ход на сервер
-            val updateResult = gameRepository.updateBoardState(gameId, board)
-            
-            if (updateResult is com.example.tictacfirebase.utils.Result.Error) {
-                val errorMessage = updateResult.message ?: updateResult.exception.message ?: "Неизвестная ошибка"
+            if (moveResult is com.example.tictacfirebase.utils.Result.Error) {
+                val errorMessage = moveResult.message ?: moveResult.exception.message ?: "Неизвестная ошибка"
                 sendEffect(UiEffect.ShowToast("Ошибка хода: $errorMessage"))
             }
-            // В случае успеха ничего не делаем - состояние обновится через observeGameChanges
+            // В случае успеха ничего не делаем - состояние обновится через observeBoardState и observeCurrentTurn
         }
     }
 

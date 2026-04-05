@@ -235,7 +235,10 @@ class GameRepository {
                     val board = Array<String?>(9) { null }
                     
                     snapshot.children.forEach { child ->
-                        child.key?.toIntOrNull()?.let { index ->
+                        val key = child.key
+                        // Пропускаем служебные ключи (firstPlayer, currentTurn, player1, player2 и т.д.)
+                        if (key != null && key.toIntOrNull() != null) {
+                            val index = key.toInt()
                             if (index in 1..9) {
                                 board[index - 1] = child.value.toString()
                             }
@@ -341,36 +344,55 @@ class GameRepository {
     }
     
     /**
-     * Обновление состояния доски
+     * Совершение хода в игре
+     * @param sessionID Уникальный идентификатор сессии
+     * @param cellIndex Индекс клетки (0-8)
+     * @param playerEmail Email игрока
+     * @param symbol Символ игрока (X или O)
+     */
+    suspend fun makeMove(sessionID: String, cellIndex: Int, playerEmail: String, symbol: String): Result<Unit> {
+        return runCatchingResult {
+            // Сохраняем ход в базу (Firebase использует ключи 1-9)
+            myRef.child("PlayerOnline").child(sessionID).child((cellIndex + 1).toString()).setValue(symbol).await()
+            
+            // Переключаем текущий ход на следующего игрока
+            val currentTurnSnapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()
+            val currentPlayer = currentTurnSnapshot.value as? String ?: ""
+            
+            val player1Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
+            val player1 = player1Snapshot.value as? String ?: ""
+            
+            val player2Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
+            val player2 = player2Snapshot.value as? String ?: ""
+            
+            val nextPlayer = if (currentPlayer == player1) player2 else player1
+            
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
+            Log.d("GameRepository", "Move made at cell $cellIndex by $playerEmail ($symbol), switched turn from $currentPlayer to $nextPlayer")
+        }
+    }
+    
+    /**
+     * Обновление состояния доски (устаревший метод, используется makeMove)
      * После обновления автоматически переключает currentTurn на следующего игрока
      */
     suspend fun updateBoardState(sessionID: String, board: List<String>): Result<Unit> {
         return runCatchingResult {
-            // Обновляем каждый элемент доски
-            board.forEachIndexed { index, value ->
-                if (value.isNotEmpty()) {
-                    myRef.child("PlayerOnline").child(sessionID).child((index + 1).toString()).setValue(value).await()
-                }
-            }
-            
-            // Переключаем текущий ход на следующего игрока
+            // Получаем текущего игрока из локальных данных (передается из ViewModel)
+            // Этот метод оставлен для обратной совместимости, но лучше использовать makeMove
             val currentTurnResult = getCurrentTurn(sessionID)
             val currentPlayer = if (currentTurnResult is Result.Success) currentTurnResult.data else ""
             
             val player1Result = getPlayer1(sessionID)
             val player1 = if (player1Result is Result.Success) player1Result.data else ""
             
-            val nextPlayer = if (currentPlayer == player1) {
-                // Если сейчас ход player1, следующий ход player2
-                val player2Result = getPlayer2(sessionID)
-                if (player2Result is Result.Success) player2Result.data else currentPlayer
-            } else {
-                // Если сейчас ход player2, следующий ход player1
-                player1
-            }
+            val player2Result = getPlayer2(sessionID)
+            val player2 = if (player2Result is Result.Success) player2Result.data else ""
+            
+            val nextPlayer = if (currentPlayer == player1) player2 else player1
             
             myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
-            Log.d("GameRepository", "Board updated, switched turn from $currentPlayer to $nextPlayer")
+            Log.d("GameRepository", "Board state updated, switched turn from $currentPlayer to $nextPlayer")
         }
     }
     
