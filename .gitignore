@@ -3,48 +3,97 @@
 *.class
 *.o
 *.obj
-*.exe
+*.out
 *.dll
 *.so
 *.a
-*.out
-build/
-target/
+*.exe
 
 # Dependencies
-node_modules/
-venv/
-.venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
 .gradle/
-.julia/
-zig*/
+build/
+target/
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
-*.swo
+
+# Editors
+.vscode/
+.idea/
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Editors
-.vscode/
-.idea/
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
 
-# System files
+# Java/Kotlin specific
+*.iml
+*.ipr
+*.iws
+*.jar
+*.war
+*.ear
+*.class
+*.gradle
+.gradle
+local.properties
+.settings/
+.loadpath
+.project
+bin/
+gen/
+out/
+*.dex
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Build outputs
+dist/
+release/
+debug/
+*.aar
+*.so
+*.dylib
+*.dll
+
+# IDE
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
 
 # Coverage
 coverage/
 htmlcov/
-.coverage
 
 # Compressed files
 *.zip

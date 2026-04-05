@@ -112,6 +112,9 @@ open class MainActivity : AppCompatActivity() {
         // Наблюдаем за UI эффектами от ViewModel (toast, навигация)
         setupUiEffectObserver()
         
+        // Наблюдаем за состоянием загрузки из ViewModel
+        setupLoadingObserver()
+        
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
     }
@@ -178,6 +181,18 @@ open class MainActivity : AppCompatActivity() {
                     }
                     else -> {}
                 }
+            }
+        }
+    }
+    
+    /**
+     * Настройка наблюдения за состоянием загрузки из ViewModel
+     * Показывает/скрывает индикатор загрузки на основе gameState.isLoading
+     */
+    private fun setupLoadingObserver() {
+        lifecycleScope.launch {
+            gameViewModel.gameState.collect { state ->
+                showLoading(state.isLoading)
             }
         }
     }
@@ -340,6 +355,10 @@ open class MainActivity : AppCompatActivity() {
     fun buRequestEvent(view: View) {
         val userDemail = etEmail.text.toString()
         Log.d(TAG, "From: " + userDemail)
+        
+        // Показываем индикатор загрузки во время отправки запроса
+        showLoading(true)
+        
         //unHide player2 icon
         player2TextView.visibility = View.VISIBLE
         imageViewUser2.visibility = View.VISIBLE
@@ -347,8 +366,13 @@ open class MainActivity : AppCompatActivity() {
 
         // Загружаем аватар противника
         lifecycleScope.launch {
-            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-            imageViewUser2.load(opponentAvatarUrl)
+            try {
+                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+                imageViewUser2.load(opponentAvatarUrl)
+            } finally {
+                // Скрываем индикатор загрузки после завершения
+                showLoading(false)
+            }
         }
 
         // Отправляем событие в ViewModel
@@ -360,6 +384,9 @@ open class MainActivity : AppCompatActivity() {
     fun buAcceptEvent(view: View) {
         val userDemail = etEmail.text.toString()
         
+        // Показываем индикатор загрузки во время принятия запроса
+        showLoading(true)
+        
         //unHide player2 icon
         player2TextView.visibility = View.VISIBLE
         imageViewUser2.visibility = View.VISIBLE
@@ -367,8 +394,13 @@ open class MainActivity : AppCompatActivity() {
         
         // Загружаем аватар противника
         lifecycleScope.launch {
-            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-            imageViewUser2.load(opponentAvatarUrl)
+            try {
+                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+                imageViewUser2.load(opponentAvatarUrl)
+            } finally {
+                // Скрываем индикатор загрузки после завершения
+                showLoading(false)
+            }
         }
 
         // Отправляем событие в ViewModel

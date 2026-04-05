@@ -56,13 +56,18 @@ class LoginActivity : AppCompatActivity() {
 
         if (email.isEmpty() || password.isEmpty()) {
             Toast.makeText(this, "Please fill out email/pw.", Toast.LENGTH_SHORT).show()
+            hideLoading()
             return
         }
         refreshTokens(stripEmail)
 
         FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
             .addOnCompleteListener {
-                if (!it.isSuccessful) return@addOnCompleteListener
+                if (!it.isSuccessful) {
+                    hideLoading()
+                    Toast.makeText(this, "Failed to log in: ${it.exception?.message}", Toast.LENGTH_SHORT).show()
+                    return@addOnCompleteListener
+                }
 
                 Log.d("Login", "Successfully logged in: ${it.result?.user!!.uid}")
 
@@ -73,13 +78,21 @@ class LoginActivity : AppCompatActivity() {
                 Log.d(tag, "putExtraUid: ${it.result?.user!!.uid}")
 
                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
-                binding.loginProgressBar.visibility = View.GONE
-                binding.loginProgressBar2.visibility = View.GONE
+                hideLoading()
                 startActivity(intent)
             }
             .addOnFailureListener {
+                hideLoading()
                 Toast.makeText(this, "Failed to log in: ${it.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    /**
+     * Скрыть индикаторы загрузки
+     */
+    private fun hideLoading() {
+        binding.loginProgressBar.visibility = View.GONE
+        binding.loginProgressBar2.visibility = View.GONE
     }
 
     private fun refreshTokens(stripEmail: String) {

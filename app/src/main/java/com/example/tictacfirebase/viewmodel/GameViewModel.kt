@@ -250,12 +250,17 @@ class GameViewModel(
      */
     private fun sendGameRequest(fromEmail: String, toEmail: String) {
         viewModelScope.launch {
-            val result = gameRepository.sendGameRequest(fromEmail, toEmail)
-            if (result is com.example.tictacfirebase.utils.Result.Success) {
-                sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail"))
-            } else if (result is com.example.tictacfirebase.utils.Result.Error) {
-                val errorMessage = result.message ?: result.exception.message ?: "Неизвестная ошибка"
-                sendEffect(UiEffect.ShowToast("Ошибка отправки запроса: $errorMessage"))
+            updateState { copy(isLoading = true) }
+            try {
+                val result = gameRepository.sendGameRequest(fromEmail, toEmail)
+                if (result is com.example.tictacfirebase.utils.Result.Success) {
+                    sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail"))
+                } else if (result is com.example.tictacfirebase.utils.Result.Error) {
+                    val errorMessage = result.message ?: result.exception.message ?: "Неизвестная ошибка"
+                    sendEffect(UiEffect.ShowToast("Ошибка отправки запроса: $errorMessage"))
+                }
+            } finally {
+                updateState { copy(isLoading = false) }
             }
         }
     }
@@ -265,20 +270,25 @@ class GameViewModel(
      */
     private fun acceptGameRequest(fromEmail: String, toEmail: String) {
         viewModelScope.launch {
-            // Очищаем запрос после принятия
-            gameRepository.clearUserRequests(toEmail)
-            
-            // Создаем сессию игры
-            val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
-            val createResult = gameRepository.createGameSession(sessionId)
-            
-            if (createResult is com.example.tictacfirebase.utils.Result.Success) {
-                // Обновляем sessionId в состоянии
-                updateState { copy(sessionId = sessionId) }
-                sendEffect(UiEffect.ShowToast("Игра началась!"))
-            } else if (createResult is com.example.tictacfirebase.utils.Result.Error) {
-                val errorMessage = createResult.message ?: createResult.exception.message ?: "Неизвестная ошибка"
-                sendEffect(UiEffect.ShowToast("Ошибка создания игры: $errorMessage"))
+            updateState { copy(isLoading = true) }
+            try {
+                // Очищаем запрос после принятия
+                gameRepository.clearUserRequests(toEmail)
+                
+                // Создаем сессию игры
+                val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
+                val createResult = gameRepository.createGameSession(sessionId)
+                
+                if (createResult is com.example.tictacfirebase.utils.Result.Success) {
+                    // Обновляем sessionId в состоянии
+                    updateState { copy(sessionId = sessionId) }
+                    sendEffect(UiEffect.ShowToast("Игра началась!"))
+                } else if (createResult is com.example.tictacfirebase.utils.Result.Error) {
+                    val errorMessage = createResult.message ?: createResult.exception.message ?: "Неизвестная ошибка"
+                    sendEffect(UiEffect.ShowToast("Ошибка создания игры: $errorMessage"))
+                }
+            } finally {
+                updateState { copy(isLoading = false) }
             }
         }
     }
