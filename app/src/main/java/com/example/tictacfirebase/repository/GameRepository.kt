@@ -326,7 +326,23 @@ class GameRepository {
     }
     
     /**
+     * Настройка игровой сессии после создания
+     * Устанавливает первого игрока, текущий ход и имена игроков
+     */
+    suspend fun setupGameSession(sessionID: String, player1: String, player2: String): Result<Unit> {
+        return runCatchingResult {
+            // Первый игрок получает "X" и ходит первым
+            myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").setValue(player1).await()
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(player1).await()
+            myRef.child("PlayerOnline").child(sessionID).child("player1").setValue(player1).await()
+            myRef.child("PlayerOnline").child(sessionID).child("player2").setValue(player2).await()
+            Log.d("GameRepository", "Game session setup: firstPlayer=$player1, currentTurn=$player1")
+        }
+    }
+    
+    /**
      * Обновление состояния доски
+     * После обновления автоматически переключает currentTurn на следующего игрока
      */
     suspend fun updateBoardState(sessionID: String, board: List<String>): Result<Unit> {
         return runCatchingResult {
@@ -336,20 +352,119 @@ class GameRepository {
                     myRef.child("PlayerOnline").child(sessionID).child((index + 1).toString()).setValue(value).await()
                 }
             }
+            
+            // Переключаем текущий ход на следующего игрока
+            val currentTurnResult = getCurrentTurn(sessionID)
+            val currentPlayer = if (currentTurnResult is Result.Success) currentTurnResult.data else ""
+            
+            val player1Result = getPlayer1(sessionID)
+            val player1 = if (player1Result is Result.Success) player1Result.data else ""
+            
+            val nextPlayer = if (currentPlayer == player1) {
+                // Если сейчас ход player1, следующий ход player2
+                val player2Result = getPlayer2(sessionID)
+                if (player2Result is Result.Success) player2Result.data else currentPlayer
+            } else {
+                // Если сейчас ход player2, следующий ход player1
+                player1
+            }
+            
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
+            Log.d("GameRepository", "Board updated, switched turn from $currentPlayer to $nextPlayer")
         }
     }
+    
+    /**
+     * Получение первого игрока из сессии
+     */
+    suspend fun getPlayer1(sessionID: String): Result<String> {
+        return runCatchingResult {
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
+            snapshot.value as? String ?: ""
+        }
+    }
+    
+    /**
+     * Получение второго игрока из сессии
+     */
+    suspend fun getPlayer2(sessionID: String): Result<String> {
+        return runCatchingResult {
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
+            snapshot.value as? String ?: ""
+        }
+    }
+    
+    /**
+     * Наблюдение за изменениями текущего хода в реальном времени
+     */
+    fun observeCurrentTurn(sessionID: String): Flow<String> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    val currentTurnSnapshot = snapshot.child("currentTurn")
+                    val currentTurn = currentTurnSnapshot.value as? String ?: ""
+                    trySend(currentTurn)
+                } catch (e: Exception) {
+                    println("observeCurrentTurn error: $e")
+                    trySend("")
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                println("observeCurrentTurn cancelled: ${error.message}")
+                trySend("")
+            }
+        }
+        
+        myRef.child("PlayerOnline").child(sessionID).addValueEventListener(listener)
+        
+        awaitClose {
+            myRef.child("PlayerOnline").child(sessionID).removeEventListener(listener)
+        }
+    }
+    
+    /**
+     * Получение полной информации о сессии
+     */
+    suspend fun getSessionInfo(sessionID: String): Result<SessionInfo> {
+        return runCatchingResult {
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).get().await()
+            val firstPlayer = snapshot.child("firstPlayer").value as? String ?: ""
+            val currentTurn = snapshot.child("currentTurn").value as? String ?: ""
+            val player1 = snapshot.child("player1").value as? String ?: ""
+            val player2 = snapshot.child("player2").value as? String ?: ""
+            
+            SessionInfo(
+                firstPlayer = firstPlayer,
+                currentTurn = currentTurn,
+                player1 = player1,
+                player2 = player2
+            )
+        }
+    }
+    
+    /**
+     * Информация о сессии
+     */
+    data class SessionInfo(
+        val firstPlayer: String,
+        val currentTurn: String,
+        val player1: String,
+        val player2: String
+    )
     
     /**
      * Получение имен игроков из сессии
      */
     suspend fun getPlayerNames(sessionID: String): Result<Pair<String, String>> {
         return runCatchingResult {
-            // В реальном приложении нужно хранить имена игроков в сессии
-            // Здесь заглушка - нужно доработать структуру данных
-            val snapshot = myRef.child("PlayerOnline").child(sessionID).get().await()
-            // Извлекаем имена из sessionID (формат: player1player2)
-            // Это упрощенная логика, лучше хранить явно в базе
-            Pair("", "")
+            val player1Result = getPlayer1(sessionID)
+            val player2Result = getPlayer2(sessionID)
+            
+            val player1 = if (player1Result is Result.Success) player1Result.data else ""
+            val player2 = if (player2Result is Result.Success) player2Result.data else ""
+            
+            Pair(player1, player2)
         }
     }
 }
