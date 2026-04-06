@@ -500,7 +500,7 @@ class GameViewModel(
                         isMyTurn = firstPlayer == currentState.currentPlayerName
                     )
                 }
-                sendEffect(UiEffect.ShowToast("Игра перезапущена. Ход игрока: ${if (firstPlayer == currentState.currentPlayerName) "Ваш" : "Соперника"}"))
+                sendEffect(UiEffect.ShowToast("Игра перезапущена. Ход игрока: ${if (firstPlayer == currentState.currentPlayerName) "Ваш" else "Соперника"}"))
             } else if (restartResult is com.example.tictacfirebase.utils.Result.Error) {
                 val errorMessage = restartResult.message ?: restartResult.exception.message ?: "Неизвестная ошибка"
                 sendEffect(UiEffect.ShowToast("Ошибка перезапуска: $errorMessage"))
