@@ -287,6 +287,8 @@ class GameViewModel(
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
                     // Создаем сессию игры для отправителя запроса
                     val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
+                    
+                    // Сначала создаем сессию (очищаем старую)
                     val createResult = gameRepository.createGameSession(sessionId)
                     
                     if (createResult is com.example.tictacfirebase.utils.Result.Success) {
@@ -301,7 +303,8 @@ class GameViewModel(
                                     currentPlayerName = fromEmail,  // Текущий пользователь (отправитель)
                                     opponentName = toEmail,         // Соперник
                                     isMyTurn = true,                // Отправитель ходит первым
-                                    gameStatus = GameStatus.Playing
+                                    gameStatus = GameStatus.Playing,
+                                    boardState = List(9) { "" }     // Очищаем доску
                                 ) 
                             }
                             
@@ -353,6 +356,8 @@ class GameViewModel(
                 
                 // Создаем сессию игры
                 val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
+                
+                // Сначала создаем сессию (очищаем старую)
                 val createResult = gameRepository.createGameSession(sessionId)
                 
                 if (createResult is com.example.tictacfirebase.utils.Result.Success) {
@@ -369,7 +374,8 @@ class GameViewModel(
                                 currentPlayerName = toEmail,  // Текущий пользователь
                                 opponentName = fromEmail,     // Соперник
                                 isMyTurn = false,             // Отправитель ходит первым
-                                gameStatus = GameStatus.Playing
+                                gameStatus = GameStatus.Playing,
+                                boardState = List(9) { "" }   // Очищаем доску
                             ) 
                         }
                         
@@ -457,6 +463,15 @@ class GameViewModel(
             val firstPlayer = if (firstPlayerResult is com.example.tictacfirebase.utils.Result.Success) firstPlayerResult.data else ""
             val mySymbol = if (currentState.currentPlayerName == firstPlayer) "X" else "O"
 
+            // Проверка: является ли текущий игрок тем, чей сейчас ход
+            val currentTurnResult = gameRepository.getCurrentTurn(gameId)
+            val currentTurn = if (currentTurnResult is com.example.tictacfirebase.utils.Result.Success) currentTurnResult.data else ""
+            
+            if (currentTurn != currentState.currentPlayerName) {
+                sendEffect(UiEffect.ShowToast("Сейчас не ваш ход!"))
+                return@launch
+            }
+
             // Отправляем ход на сервер (один атомарный вызов)
             val moveResult = gameRepository.makeMove(gameId, cellIndex, currentState.currentPlayerName, mySymbol)
             
@@ -470,19 +485,22 @@ class GameViewModel(
 
     private fun restartGame() {
         viewModelScope.launch {
-            val currentTurnResult = gameRepository.getCurrentTurn(gameId)
-            val currentTurn = if (currentTurnResult is com.example.tictacfirebase.utils.Result.Success) currentTurnResult.data else ""
+            // Получаем первого игрока до перезапуска - он будет ходить первым в новой игре
+            val firstPlayerResult = gameRepository.getFirstPlayer(gameId)
+            val firstPlayer = if (firstPlayerResult is com.example.tictacfirebase.utils.Result.Success) firstPlayerResult.data else ""
+            
             val restartResult = gameRepository.restartGame(gameId)
             
             if (restartResult is com.example.tictacfirebase.utils.Result.Success) {
+                val currentState = _gameState.value
                 updateState {
                     copy(
                         boardState = List(9) { "" },
                         gameStatus = GameStatus.Playing,
-                        isMyTurn = currentTurn == _gameState.value.currentPlayerName
+                        isMyTurn = firstPlayer == currentState.currentPlayerName
                     )
                 }
-                sendEffect(UiEffect.ShowToast("Игра перезапущена"))
+                sendEffect(UiEffect.ShowToast("Игра перезапущена. Ход игрока: ${if (firstPlayer == currentState.currentPlayerName) "Ваш" : "Соперника"}"))
             } else if (restartResult is com.example.tictacfirebase.utils.Result.Error) {
                 val errorMessage = restartResult.message ?: restartResult.exception.message ?: "Неизвестная ошибка"
                 sendEffect(UiEffect.ShowToast("Ошибка перезапуска: $errorMessage"))
