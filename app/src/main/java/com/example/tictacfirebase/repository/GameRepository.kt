@@ -84,7 +84,9 @@ class GameRepository {
     suspend fun createGameSession(sessionID: String): Result<Unit> {
         return runCatchingResult {
             // Очищаем только нашу сессию, а не все PlayerOnline
+            // Это удаляет старые ходы, но setupGameSession установит player1, player2, firstPlayer, currentTurn заново
             myRef.child("PlayerOnline").child(sessionID).removeValue().await()
+            Log.d("GameRepository", "Game session created/cleared: $sessionID")
         }
     }
     
@@ -318,13 +320,28 @@ class GameRepository {
     }
     
     /**
-     * Перезапуск игры (очистка доски)
+     * Перезапуск игры (очистка доски с сохранением игроков)
      */
     suspend fun restartGame(sessionID: String): Result<Unit> {
         return runCatchingResult {
-            // Очищаем все ходы в сессии
-            myRef.child("PlayerOnline").child(sessionID).removeValue().await()
-            // Можно добавить установку флага currentTurn и firstPlayer заново
+            // Получаем текущих игроков перед очисткой
+            val player1Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
+            val player2Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
+            val firstPlayerSnapshot = myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").get().await()
+            
+            val player1 = player1Snapshot.value as? String ?: ""
+            val player2 = player2Snapshot.value as? String ?: ""
+            val firstPlayer = firstPlayerSnapshot.value as? String ?: player1
+            
+            // Очищаем только ходы (клетки 1-9), но сохраняем информацию об игроках
+            for (i in 1..9) {
+                myRef.child("PlayerOnline").child(sessionID).child(i.toString()).removeValue().await()
+            }
+            
+            // Восстанавливаем currentTurn - ход переходит к первому игроку
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(firstPlayer).await()
+            
+            Log.d("GameRepository", "Game restarted: player1=$player1, player2=$player2, firstPlayer=$firstPlayer, currentTurn=$firstPlayer")
         }
     }
     
