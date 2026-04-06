@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
  */
 class GameViewModel(
     private val gameRepository: GameRepository,
-    private val gameId: String,
+    initialGameId: String,
     private val context: android.content.Context
 ) : ViewModel() {
 
@@ -35,6 +35,13 @@ class GameViewModel(
     val uiEffect: SharedFlow<UiEffect> = _uiEffect.asSharedFlow()
 
     private val gameManager = GameManager()
+    
+    // Идентификатор текущей игры - может быть обновлен при создании/присоединении к новой игре
+    private var _gameId: String = initialGameId
+    
+    // Геттер для gameId, который использует sessionId из состояния если он установлен
+    private val gameId: String
+        get() = _gameState.value.sessionId ?: _gameId
 
     init {
         observeNetworkStatus()
@@ -99,6 +106,13 @@ class GameViewModel(
 
     private fun loadInitialData() {
         viewModelScope.launch {
+            // Не показываем isLoading при первоначальной загрузке, если sessionId еще не установлен
+            // Это предотвращает блокировку UI когда игра еще не началась
+            val currentState = _gameState.value
+            if (currentState.sessionId.isNullOrEmpty()) {
+                return@launch
+            }
+            
             updateState { copy(isLoading = true) }
             
             // Загружаем информацию о сессии (первый игрок, текущий ход, второй игрок)
@@ -271,7 +285,52 @@ class GameViewModel(
             try {
                 val result = gameRepository.sendGameRequest(fromEmail, toEmail)
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
-                    sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail"))
+                    // Создаем сессию игры для отправителя запроса
+                    val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
+                    val createResult = gameRepository.createGameSession(sessionId)
+                    
+                    if (createResult is com.example.tictacfirebase.utils.Result.Success) {
+                        // Настраиваем сессию: отправитель запроса получает "X" и ходит первым
+                        val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
+                        
+                        if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
+                            // Обновляем sessionId в состоянии - это также обновит gameId через getter
+                            updateState { 
+                                copy(
+                                    sessionId = sessionId,
+                                    currentPlayerName = fromEmail,  // Текущий пользователь (отправитель)
+                                    opponentName = toEmail,         // Соперник
+                                    isMyTurn = true,                // Отправитель ходит первым
+                                    gameStatus = GameStatus.Playing
+                                ) 
+                            }
+                            
+                            // Загружаем аватарки
+                            val myAvatarResult = gameRepository.getUserProfileImage(fromEmail)
+                            val opponentAvatarResult = gameRepository.getUserProfileImage(toEmail)
+                            
+                            val myAvatar = if (myAvatarResult is com.example.tictacfirebase.utils.Result.Success) myAvatarResult.data else null
+                            val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
+                            
+                            updateState {
+                                copy(
+                                    playerAvatarUrl = myAvatar,
+                                    opponentAvatarUrl = opponentAvatar
+                                )
+                            }
+                            
+                            sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail. Вы ходите первым (X)"))
+                            
+                            // Перезагружаем данные игры с новым sessionId
+                            loadInitialData()
+                        } else if (setupResult is com.example.tictacfirebase.utils.Result.Error) {
+                            val errorMessage = setupResult.message ?: setupResult.exception.message ?: "Неизвестная ошибка"
+                            sendEffect(UiEffect.ShowToast("Ошибка настройки игры: $errorMessage"))
+                        }
+                    } else if (createResult is com.example.tictacfirebase.utils.Result.Error) {
+                        val errorMessage = createResult.message ?: createResult.exception.message ?: "Неизвестная ошибка"
+                        sendEffect(UiEffect.ShowToast("Ошибка создания игры: $errorMessage"))
+                    }
                 } else if (result is com.example.tictacfirebase.utils.Result.Error) {
                     val errorMessage = result.message ?: result.exception.message ?: "Неизвестная ошибка"
                     sendEffect(UiEffect.ShowToast("Ошибка отправки запроса: $errorMessage"))
@@ -301,7 +360,7 @@ class GameViewModel(
                     val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
                     
                     if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
-                        // Обновляем sessionId в состоянии
+                        // Обновляем sessionId в состоянии - это также обновит gameId через getter
                         // toEmail - это текущий пользователь (который принял запрос)
                         // fromEmail - это соперник (который отправил запрос)
                         updateState { 
@@ -329,6 +388,9 @@ class GameViewModel(
                         }
                         
                         sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите вторым (O)"))
+                        
+                        // Перезагружаем данные игры с новым sessionId
+                        loadInitialData()
                     } else if (setupResult is com.example.tictacfirebase.utils.Result.Error) {
                         val errorMessage = setupResult.message ?: setupResult.exception.message ?: "Неизвестная ошибка"
                         sendEffect(UiEffect.ShowToast("Ошибка настройки игры: $errorMessage"))
@@ -390,7 +452,7 @@ class GameViewModel(
                 return@launch // Клетка занята
             }
 
-            // Определяем мой символ
+            // Определяем мой символ через базу данных - первый игрок (отправитель запроса) получает "X"
             val firstPlayerResult = gameRepository.getFirstPlayer(gameId)
             val firstPlayer = if (firstPlayerResult is com.example.tictacfirebase.utils.Result.Success) firstPlayerResult.data else ""
             val mySymbol = if (currentState.currentPlayerName == firstPlayer) "X" else "O"
