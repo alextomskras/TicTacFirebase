@@ -355,6 +355,19 @@ open class MainActivity : AppCompatActivity() {
 
     fun buRequestEvent(view: View) {
         val userDemail = etEmail.text.toString()
+        
+        // Проверяем, не пустой ли email
+        if (userDemail.isBlank()) {
+            Toast.makeText(this, "Введите email пользователя", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Проверяем, не тот же ли это самый пользователь
+        if (userDemail.equals(myEmail, ignoreCase = true)) {
+            Toast.makeText(this, "Нельзя отправить запрос самому себе", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
         Log.d(TAG, "From: " + userDemail)
         
         // Показываем индикатор загрузки во время отправки запроса
