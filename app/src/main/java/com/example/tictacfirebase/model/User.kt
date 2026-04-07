@@ -1,4 +1,4 @@
-package com.example.tictacfirebase.models
+package com.example.tictacfirebase.model
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
