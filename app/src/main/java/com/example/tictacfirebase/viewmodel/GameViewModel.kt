@@ -278,6 +278,7 @@ class GameViewModel(
 
     /**
      * Отправка запроса на игру другому пользователю
+     * ПРОВЕРЯЕТ: нет ли уже активного приглашения
      */
     private fun sendGameRequest(fromEmail: String, toEmail: String) {
         viewModelScope.launch {
@@ -285,58 +286,17 @@ class GameViewModel(
             try {
                 val result = gameRepository.sendGameRequest(fromEmail, toEmail)
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
-                    // Создаем сессию игры для отправителя запроса
-                    val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
-                    
-                    // Сначала создаем сессию (очищаем старую)
-                    val createResult = gameRepository.createGameSession(sessionId)
-                    
-                    if (createResult is com.example.tictacfirebase.utils.Result.Success) {
-                        // Настраиваем сессию: отправитель запроса получает "X" и ходит первым
-                        val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
-                        
-                        if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
-                            // Обновляем sessionId в состоянии - это также обновит gameId через getter
-                            updateState { 
-                                copy(
-                                    sessionId = sessionId,
-                                    currentPlayerName = fromEmail,  // Текущий пользователь (отправитель)
-                                    opponentName = toEmail,         // Соперник
-                                    isMyTurn = true,                // Отправитель ходит первым
-                                    gameStatus = GameStatus.Playing,
-                                    boardState = List(9) { "" }     // Очищаем доску
-                                ) 
-                            }
-                            
-                            // Загружаем аватарки
-                            val myAvatarResult = gameRepository.getUserProfileImage(fromEmail)
-                            val opponentAvatarResult = gameRepository.getUserProfileImage(toEmail)
-                            
-                            val myAvatar = if (myAvatarResult is com.example.tictacfirebase.utils.Result.Success) myAvatarResult.data else null
-                            val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
-                            
-                            updateState {
-                                copy(
-                                    playerAvatarUrl = myAvatar,
-                                    opponentAvatarUrl = opponentAvatar
-                                )
-                            }
-                            
-                            sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail. Вы ходите первым (X)"))
-                            
-                            // Перезагружаем данные игры с новым sessionId
-                            loadInitialData()
-                        } else if (setupResult is com.example.tictacfirebase.utils.Result.Error) {
-                            val errorMessage = setupResult.message ?: setupResult.exception.message ?: "Неизвестная ошибка"
-                            sendEffect(UiEffect.ShowToast("Ошибка настройки игры: $errorMessage"))
-                        }
-                    } else if (createResult is com.example.tictacfirebase.utils.Result.Error) {
-                        val errorMessage = createResult.message ?: createResult.exception.message ?: "Неизвестная ошибка"
-                        sendEffect(UiEffect.ShowToast("Ошибка создания игры: $errorMessage"))
-                    }
+                    // Запрос успешно отправлен (или уже существовал)
+                    // НЕ создаем сессию игры здесь - сессия будет создана только когда получатель примет запрос
+                    sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail. Ожидайте подтверждения..."))
                 } else if (result is com.example.tictacfirebase.utils.Result.Error) {
                     val errorMessage = result.message ?: result.exception.message ?: "Неизвестная ошибка"
-                    sendEffect(UiEffect.ShowToast("Ошибка отправки запроса: $errorMessage"))
+                    // Проверяем, это ошибка "встречного приглашения"?
+                    if (errorMessage.contains("уже пригласил вас")) {
+                        sendEffect(UiEffect.ShowToast(errorMessage))
+                    } else {
+                        sendEffect(UiEffect.ShowToast("Ошибка отправки запроса: $errorMessage"))
+                    }
                 }
             } finally {
                 updateState { copy(isLoading = false) }
@@ -346,6 +306,7 @@ class GameViewModel(
 
     /**
      * Принятие запроса на игру
+     * СОЗДАЕТ игровую сессию и определяет кто будет X, а кто O
      */
     private fun acceptGameRequest(fromEmail: String, toEmail: String) {
         viewModelScope.launch {
@@ -354,26 +315,27 @@ class GameViewModel(
                 // Очищаем запрос после принятия
                 gameRepository.clearUserRequests(toEmail)
                 
-                // Создаем сессию игры
+                // Создаем сессию игры - имя сессии всегда от отправителя к получателю
                 val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
                 
                 // Сначала создаем сессию (очищаем старую)
                 val createResult = gameRepository.createGameSession(sessionId)
                 
                 if (createResult is com.example.tictacfirebase.utils.Result.Success) {
-                    // Настраиваем сессию: первый игрок (отправитель запроса) получает "X" и ходит первым
+                    // Настраиваем сессию: ОТПРАВИТЕЛЬ запроса (fromEmail) получает "X" и ходит первым
+                    // Получатель запроса (toEmail) получает "O" и ходит вторым
                     val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
                     
                     if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
-                        // Обновляем sessionId в состоянии - это также обновит gameId через getter
-                        // toEmail - это текущий пользователь (который принял запрос)
-                        // fromEmail - это соперник (который отправил запрос)
+                        // Обновляем sessionId в состоянии
+                        // toEmail - это текущий пользователь (который принял запрос) -> он получает "O"
+                        // fromEmail - это соперник (который отправил запрос) -> он получает "X"
                         updateState { 
                             copy(
                                 sessionId = sessionId,
-                                currentPlayerName = toEmail,  // Текущий пользователь
-                                opponentName = fromEmail,     // Соперник
-                                isMyTurn = false,             // Отправитель ходит первым
+                                currentPlayerName = toEmail,  // Текущий пользователь (принявший запрос)
+                                opponentName = fromEmail,     // Соперник (отправитель запроса)
+                                isMyTurn = false,             // Отправитель (X) ходит первым, поэтому у текущего пользователя (O) не его ход
                                 gameStatus = GameStatus.Playing,
                                 boardState = List(9) { "" }   // Очищаем доску
                             ) 
@@ -393,7 +355,7 @@ class GameViewModel(
                             )
                         }
                         
-                        sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите вторым (O)"))
+                        sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите вторым (O). $fromEmail ходит первым (X)"))
                         
                         // Перезагружаем данные игры с новым sessionId
                         loadInitialData()

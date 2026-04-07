@@ -1,13 +1,16 @@
 ```
-# Compiled/Binary files
+# Compiled and build artifacts
 *.class
 *.o
 *.obj
+*.exe
+*.dll
 *.so
 *.a
-*.dll
-*.exe
 *.out
+build/
+dist/
+target/
 
 # Dependencies
 node_modules/
@@ -16,29 +19,28 @@ venv/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
-target/
 .gradle/
+julia-*/
+zig*/
 
-# Build artifacts
-build/
-dist/
-
-# Editors/IDE
-.vscode/
-.idea/
+# Logs and temp files
+*.log
+*.tmp
 *.swp
 *.swo
-*.tmp
 
-# System/Environment
-.DS_Store
-Thumbs.db
+# Environment
 .env
 .env.local
 *.env.*
 
-# Logs
-*.log
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
 
 # Coverage
 coverage/
