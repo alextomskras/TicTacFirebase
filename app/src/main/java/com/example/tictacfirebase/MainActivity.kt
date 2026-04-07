@@ -22,6 +22,7 @@ import com.example.tictacfirebase.utils.splitEmailFull
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import coil.load
@@ -405,6 +406,24 @@ open class MainActivity : AppCompatActivity() {
 
         // Отправляем событие в ViewModel
         gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
+    }
+
+    /**
+     * Обработчик кнопки выхода (logout)
+     * Выходит из аккаунта и перенаправляет на экран регистрации
+     */
+    fun buLogoutEvent(view: View) {
+        Log.d(TAG, "User logged out")
+        
+        // Выход из Firebase Authentication
+        FirebaseAuth.getInstance().signOut()
+        
+        // Переход на экран регистрации
+        val intent = Intent(this, registerActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(intent)
+        finish()
     }
     
     /**
