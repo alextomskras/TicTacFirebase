@@ -106,12 +106,60 @@ fcm_queue/
     timestamp: 1234567890
 
 PlayerOnline/
-  userA_userB/
+  userA_userB/  # Симметричное имя (сортировка по алфавиту)
     1: "userA@example.com"  // ход в клетку 1
     2: "userB@example.com"  // ход в клетку 2
     currentTurn: "userA@example.com"
     firstPlayer: "userA@example.com"
 ```
+
+## Важное изменение: симметричное имя сессии
+
+Теперь имя сессии генерируется симметрично - email'ы сортируются по алфавиту:
+- `generateSessionId("userB@example.com", "userA@example.com")` → `"userA_userB"`
+- `generateSessionId("userA@example.com", "userB@example.com")` → `"userA_userB"`
+
+Это гарантирует, что оба игрока будут использовать одно и то же имя сессии независимо от того, кто отправил запрос.
+
+## Очистка старых веток в базе данных
+
+**ВАЖНО:** После внедрения симметричных имен сессий, в базе данных могут остаться старые ветки с некорректными именами (например, `t4_t3` вместо `t3_t4`).
+
+### Как очистить базу данных от старых веток:
+
+1. **Вручную через Firebase Console:**
+   - Откройте Firebase Console → Realtime Database
+   - Найдите узел `PlayerOnline`
+   - Удалите все ветки с некорректным порядком имен (где первый игрок alphabetically больше второго)
+   - Например, удалите `t4_t3`, оставив только `t3_t4`
+
+2. **Или через Firebase CLI:**
+   ```bash
+   # Экспорт данных
+   firebase database:get /PlayerOnline > playeronline_backup.json
+   
+   # Отредактируйте файл, удалив старые ветки
+   # Затем загрузите обратно
+   firebase database:set /PlayerOnline playeronline_backup.json
+   ```
+
+3. **Программно (добавить временный метод в GameRepository):**
+   ```kotlin
+   suspend fun cleanupOldSessions(): Result<Unit> {
+       return runCatchingResult {
+           val snapshot = myRef.child("PlayerOnline").get().await()
+           snapshot.children.forEach { child ->
+               val sessionId = child.key ?: return@forEach
+               val parts = sessionId.split("_")
+               if (parts.size == 2 && parts[0] > parts[1]) {
+                   // Это старая сессия с неправильным порядком
+                   myRef.child("PlayerOnline").child(sessionId).removeValue().await()
+                   Log.d("GameRepository", "Removed old session: $sessionId")
+               }
+           }
+       }
+   }
+   ```
 
 ## Что нужно сделать дополнительно
 

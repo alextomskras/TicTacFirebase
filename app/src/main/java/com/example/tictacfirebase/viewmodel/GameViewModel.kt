@@ -305,6 +305,22 @@ class GameViewModel(
     }
 
     /**
+     * Генерация симметричного имени сессии (комнаты) для двух игроков.
+     * Email'ы сортируются, чтобы имя сессии было одинаковым независимо от того,
+     * кто отправил запрос, а кто принял.
+     * Например: "user1_user2" вместо "user2_user1"
+     */
+    private fun generateSessionId(email1: String, email2: String): String {
+        val name1 = email1.substringBefore("@")
+        val name2 = email2.substringBefore("@")
+        return if (name1 < name2) {
+            "${name1}_${name2}"
+        } else {
+            "${name2}_${name1}"
+        }
+    }
+    
+    /**
      * Принятие запроса на игру
      * СОЗДАЕТ игровую сессию и определяет кто будет X, а кто O
      */
@@ -315,8 +331,8 @@ class GameViewModel(
                 // Очищаем запрос после принятия
                 gameRepository.clearUserRequests(toEmail)
                 
-                // Создаем сессию игры - имя сессии всегда от отправителя к получателю
-                val sessionId = "${fromEmail.substringBefore("@")}_${toEmail.substringBefore("@")}"
+                // Создаем сессию игры с СИММЕТРИЧНЫМ именем (сортировка email'ов)
+                val sessionId = generateSessionId(fromEmail, toEmail)
                 
                 // Сначала создаем сессию (очищаем старую)
                 val createResult = gameRepository.createGameSession(sessionId)

@@ -3,25 +3,21 @@
 *.class
 *.o
 *.obj
-*.exe
-*.dll
 *.so
-*.a
+*.dll
+*.exe
 *.out
 build/
 dist/
-target/
 
 # Dependencies
-node_modules/
-venv/
 .venv/
+venv/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
 .gradle/
-julia-*/
-zig*/
+target/
 
 # Logs and temp files
 *.log
