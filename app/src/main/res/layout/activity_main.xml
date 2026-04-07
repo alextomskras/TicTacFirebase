@@ -43,6 +43,16 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:text="@string/accept" />
+
+        <Button
+                android:id="@+id/buLogout"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginStart="3pt"
+                android:layout_weight="1"
+                android:background="@drawable/rounded_button_request"
+                android:onClick="buLogoutEvent"
+                android:text="Выйти" />
     </LinearLayout>
 
     <!-- Индикатор загрузки -->
