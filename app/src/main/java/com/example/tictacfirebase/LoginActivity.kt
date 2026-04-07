@@ -99,21 +99,21 @@ class LoginActivity : AppCompatActivity() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w(tag, "Fetching FCM registration token failed", task.exception)
+                hideLoading()
                 return@addOnCompleteListener
             }
             val newToken = task.result
-            Log.d("newToken", newToken)
-            Toast.makeText(this, "Token: $newToken", Toast.LENGTH_SHORT).show()
+            Log.d("FCM_TOKEN", "Token fetched successfully")
 
             if (newToken != null) {
                 MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
                 val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
                 ref.setValue(newToken)
                     .addOnSuccessListener {
-                        Log.d(tag, "Finally we saved the Token to Firebase Database")
+                        Log.d(tag, "Successfully saved Token to Firebase Database")
                     }
                     .addOnFailureListener {
-                        Log.d(tag, "Failed to set value to database: ${it.message}")
+                        Log.d(tag, "Failed to save token to database: ${it.message}")
                     }
 
             }

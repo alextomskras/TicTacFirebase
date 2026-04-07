@@ -40,11 +40,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         val deviceToken = token
-        Log.d("NEW_TOKEN", deviceToken)
+        Log.d("FCM_TOKEN", "New token generated")
 
         if (!token.isNullOrEmpty()) {
-            Log.d(tag, "TOKEN_$token")
-            Toast.makeText(this, "New Token: $token", Toast.LENGTH_SHORT).show()
+            Log.d(tag, "Token saved to database")
             saveTokenToFirebaseDatabase(token)
         }
     }

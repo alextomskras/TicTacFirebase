@@ -226,11 +226,11 @@ class registerActivity : AppCompatActivity() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w(tag, "Fetching FCM registration token failed", task.exception)
+                hideLoading()
                 return@addOnCompleteListener
             }
             val newToken = task.result
-            Log.d("newToken", newToken)
-            Toast.makeText(this, "Token: $newToken", Toast.LENGTH_SHORT).show()
+            Log.d("FCM_TOKEN", "Token fetched successfully")
 
             if (newToken != null) {
                 GlobalScope.launch(Dispatchers.IO) {
