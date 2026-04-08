@@ -299,6 +299,19 @@ class GameViewModel(
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
             try {
+                // Очищаем sessionId перед отправкой нового запроса - это сбросит состояние старой игры
+                updateState { 
+                    copy(
+                        sessionId = null,
+                        boardState = List(9) { "" },
+                        gameStatus = GameStatus.WaitingForOpponent,
+                        isMyTurn = false,
+                        isFirstPlayer = false,
+                        currentPlayerName = "",
+                        opponentName = ""
+                    ) 
+                }
+                
                 val result = gameRepository.sendGameRequest(fromEmail, toEmail)
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
                     // Запрос успешно отправлен (или уже существовал)
