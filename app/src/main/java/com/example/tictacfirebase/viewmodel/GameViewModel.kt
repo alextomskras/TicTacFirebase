@@ -302,39 +302,7 @@ class GameViewModel(
                 val result = gameRepository.sendGameRequest(fromEmail, toEmail)
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
                     // Запрос успешно отправлен (или уже существовал)
-                    // СОЗДАЕМ сессию игры сразу - отправитель запроса будет player1 (X)
-                    val sessionId = generateSessionId(fromEmail, toEmail)
-                    val createResult = gameRepository.createGameSession(sessionId)
-                    
-                    if (createResult is com.example.tictacfirebase.utils.Result.Success) {
-                        // Настраиваем сессию: ОТПРАВИТЕЛЬ запроса (fromEmail) получает "X" и ходит первым
-                        val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
-                        
-                        if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
-                            // Загружаем аватарки
-                            val myAvatarResult = gameRepository.getUserProfileImage(fromEmail)
-                            val opponentAvatarResult = gameRepository.getUserProfileImage(toEmail)
-                            
-                            val myAvatar = if (myAvatarResult is com.example.tictacfirebase.utils.Result.Success) myAvatarResult.data else null
-                            val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
-                            
-                            // Обновляем состояние: отправитель запроса - первый игрок (X)
-                            updateState {
-                                copy(
-                                    sessionId = sessionId,
-                                    currentPlayerName = fromEmail,
-                                    opponentName = toEmail,
-                                    playerAvatarUrl = myAvatar,
-                                    opponentAvatarUrl = opponentAvatar,
-                                    isMyTurn = true,              // Отправитель (X) ходит первым
-                                    gameStatus = GameStatus.Playing,
-                                    boardState = List(9) { "" },
-                                    isFirstPlayer = true           // Отправитель запроса всегда первый игрок (X)
-                                )
-                            }
-                        }
-                    }
-                    
+                    // НЕ создаем сессию игры здесь - сессия будет создана только когда получатель примет запрос
                     sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail. Ожидайте подтверждения..."))
                 } else if (result is com.example.tictacfirebase.utils.Result.Error) {
                     val errorMessage = result.message ?: result.exception.message ?: "Неизвестная ошибка"
