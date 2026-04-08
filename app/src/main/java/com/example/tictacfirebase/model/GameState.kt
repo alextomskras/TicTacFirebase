@@ -15,7 +15,8 @@ data class GameState(
     val boardState: List<String> = List(9) { "" }, // "X", "O", ""
     val gameStatus: GameStatus = GameStatus.WaitingForOpponent,
     val errorMessage: String? = null,
-    val sessionId: String? = null
+    val sessionId: String? = null,
+    val isFirstPlayer: Boolean = false // Является ли текущий игрок первым (X)
 )
 
 /**

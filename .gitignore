@@ -1,1 +1,3 @@
-Nothing should be ignored in this case, as the only modified file is a source code file (.kt) and there are no build artifacts, dependencies, or temporary files in the changes.
+```
+.gradle/
+```

@@ -125,6 +125,11 @@ class GameViewModel(
                 val firstPlayer = sessionInfo.firstPlayer
                 val currentTurn = sessionInfo.currentTurn
                 
+                // Определяем кто есть кто относительно текущего пользователя
+                // player1 в базе - это первый игрок (X), player2 - второй игрок (O)
+                // Нам нужно определить: являюсь ли я player1 или player2
+                val amIPlayer1 = (myName == _gameState.value.currentPlayerName)
+                
                 // Загружаем аватарки (асинхронно, не блокируя основной поток)
                 val myAvatarResult = gameRepository.getUserProfileImage(myName)
                 val opponentAvatarResult = gameRepository.getUserProfileImage(opponentName)
@@ -141,7 +146,9 @@ class GameViewModel(
                         isLoading = false,
                         sessionId = gameId,
                         isMyTurn = currentTurn == myName,
-                        gameStatus = GameStatus.Playing
+                        gameStatus = GameStatus.Playing,
+                        // Сохраняем кто первый игрок для определения символа
+                        isFirstPlayer = amIPlayer1
                     )
                 }
             } else if (sessionInfoResult is com.example.tictacfirebase.utils.Result.Error) {
@@ -188,24 +195,16 @@ class GameViewModel(
                 val winResult = checkWin(tempGameState)
                 
                 // Определяем статус игры на основе результата
-                // Сравниваем: если player1Moves содержит выигрышную комбинацию, то победил игрок с символом X
-                // Если player2Moves содержит выигрышную комбинацию, то победил игрок с символом O
+                // Используем isFirstPlayer для определения кто я (X или O)
+                val currentState = _gameState.value
                 val newStatus = when {
                     winResult?.winner == "Player1" -> {
-                        // Победил игрок с X. Нужно определить, это я или соперник?
-                        // Получаем firstPlayer из базы - он имеет символ X
-                        val currentState = _gameState.value
-                        val firstPlayer = currentState.opponentName // opponentName был установлен как fromEmail (отправитель запроса = X)
-                        // Но нам нужно проверить кто есть кто - currentPlayerName vs opponentName
-                        // В acceptGameRequest: currentPlayerName = toEmail (O), opponentName = fromEmail (X)
-                        // Значит if myName == opponentName -> я X (игрок 1), иначе я O (игрок 2)
-                        if (myName == currentState.opponentName) GameStatus.Won else GameStatus.Lost
+                        // Победил игрок с X. Если я первый игрок (X), то я победил
+                        if (currentState.isFirstPlayer) GameStatus.Won else GameStatus.Lost
                     }
                     winResult?.winner == "Player2" -> {
-                        // Победил игрок с O. 
-                        val currentState = _gameState.value
-                        // if myName == currentPlayerName (toEmail) -> я O (игрок 2) и я победил
-                        if (myName == currentState.currentPlayerName) GameStatus.Won else GameStatus.Lost
+                        // Победил игрок с O. Если я не первый игрок (значит я O), то я победил
+                        if (!currentState.isFirstPlayer) GameStatus.Won else GameStatus.Lost
                     }
                     winResult?.winner == "Draw" -> GameStatus.Draw
                     else -> GameStatus.Playing
@@ -229,7 +228,9 @@ class GameViewModel(
                 
                 updateState {
                     copy(
-                        isMyTurn = isMyTurn
+                        isMyTurn = isMyTurn,
+                        // Обновляем currentPlayerName и opponentName из currentTurn если они еще не установлены
+                        currentPlayerName = if (_gameState.value.currentPlayerName.isEmpty()) currentTurn else _gameState.value.currentPlayerName
                     )
                 }
             }
@@ -365,6 +366,7 @@ class GameViewModel(
                         val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
                         
                         // Обновляем sessionId в состоянии - это вызовет обновление gameId и перезапуск наблюдения
+                        // Принявший запрос (toEmail) является вторым игроком (O), значит isFirstPlayer = false
                         updateState { 
                             copy(
                                 sessionId = sessionId,
@@ -374,7 +376,8 @@ class GameViewModel(
                                 opponentAvatarUrl = opponentAvatar,
                                 isMyTurn = false,             // Отправитель (X) ходит первым, поэтому у текущего пользователя (O) не его ход
                                 gameStatus = GameStatus.Playing,
-                                boardState = List(9) { "" }   // Очищаем доску
+                                boardState = List(9) { "" },   // Очищаем доску
+                                isFirstPlayer = false          // Принявший запрос всегда второй игрок (O)
                             ) 
                         }
                         
@@ -441,16 +444,12 @@ class GameViewModel(
                 return@launch // Клетка занята
             }
 
-            // Определяем мой символ через базу данных - первый игрок (отправитель запроса) получает "X"
-            val firstPlayerResult = gameRepository.getFirstPlayer(gameId)
-            val firstPlayer = if (firstPlayerResult is com.example.tictacfirebase.utils.Result.Success) firstPlayerResult.data else ""
-            val mySymbol = if (currentState.currentPlayerName == firstPlayer) "X" else "O"
+            // Определяем мой символ через isFirstPlayer - первый игрок (X), второй игрок (O)
+            val mySymbol = if (currentState.isFirstPlayer) "X" else "O"
 
             // Проверка: является ли текущий игрок тем, чей сейчас ход
-            val currentTurnResult = gameRepository.getCurrentTurn(gameId)
-            val currentTurn = if (currentTurnResult is com.example.tictacfirebase.utils.Result.Success) currentTurnResult.data else ""
-            
-            if (currentTurn != currentState.currentPlayerName) {
+            // Используем isMyTurn из состояния, которое обновляется через observeCurrentTurn
+            if (!currentState.isMyTurn) {
                 sendEffect(UiEffect.ShowToast("Сейчас не ваш ход!"))
                 return@launch
             }

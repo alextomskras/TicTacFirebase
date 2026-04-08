@@ -118,6 +118,9 @@ open class MainActivity : AppCompatActivity() {
         
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
+        
+        // Наблюдаем за состоянием игры (доска, статус, чей ход) и обновляем UI
+        setupGameObserver()
     }
 
     /**
@@ -243,6 +246,64 @@ open class MainActivity : AppCompatActivity() {
         super.onDestroy()
         // Скрываем индикатор загрузки
         showLoading(false)
+    }
+    
+    /**
+     * Настройка наблюдения за состоянием игры и обновление UI
+     * Обновляет доску, статус игры, аватарки и индикатор хода
+     */
+    private fun setupGameObserver() {
+        lifecycleScope.launch {
+            gameViewModel.gameState.collect { state ->
+                // Обновляем доску
+                state.boardState.forEachIndexed { index, cellValue ->
+                    val button = when (index + 1) {
+                        1 -> bu1
+                        2 -> bu2
+                        3 -> bu3
+                        4 -> bu4
+                        5 -> bu5
+                        6 -> bu6
+                        7 -> bu7
+                        8 -> bu8
+                        9 -> bu9
+                        else -> null
+                    }
+                    button?.text = cellValue
+                }
+                
+                // Обновляем аватарки игроков - постоянно обновляем чтобы не пропадали
+                state.playerAvatarUrl?.let { url ->
+                    // player1 avatar можно добавить если есть imageViewUser1
+                }
+                state.opponentAvatarUrl?.let { url ->
+                    if (url.isNotEmpty()) {
+                        imageViewUser2.load(url)
+                    }
+                }
+                
+                // Обновляем индикатор чей ход и статус игры
+                if (state.gameStatus == com.example.tictacfirebase.model.GameStatus.Playing) {
+                    if (state.isMyTurn) {
+                        // Определяем мой символ через isFirstPlayer
+                        val mySymbol = if (state.isFirstPlayer) "X" else "O"
+                        supportActionBar?.subtitle = "Ваш ход ($mySymbol)"
+                    } else {
+                        supportActionBar?.subtitle = "Ход соперника..."
+                    }
+                } else {
+                    // Показываем результат игры
+                    val resultText = when (state.gameStatus) {
+                        com.example.tictacfirebase.model.GameStatus.Won -> "Вы победили!"
+                        com.example.tictacfirebase.model.GameStatus.Lost -> "Вы проиграли!"
+                        com.example.tictacfirebase.model.GameStatus.Draw -> "Ничья!"
+                        com.example.tictacfirebase.model.GameStatus.OpponentLeft -> "Соперник вышел из игры"
+                        else -> ""
+                    }
+                    supportActionBar?.subtitle = resultText
+                }
+            }
+        }
     }
     
     /**
