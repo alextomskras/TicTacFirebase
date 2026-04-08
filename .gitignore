@@ -1,3 +1,63 @@
-```
+# Compiled and build artifacts
+*.class
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
 .gradle/
-```
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# System files
+.DS_Store
+Thumbs.db
+.env
+.env.local
+*.env.*
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Build directories
+build/
+dist/
+
+# Android specific
+*.apk
+*.aar
+local.properties
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+*.keystore
+debug.keystore
+
+# Kotlin/Android compiled files
+*.kotlin_metadata
+*.class
+
+# Java compiled files
+*.class
