@@ -289,7 +289,8 @@ open class MainActivity : AppCompatActivity() {
                         val mySymbol = if (state.isFirstPlayer) "X" else "O"
                         supportActionBar?.subtitle = "Ваш ход ($mySymbol)"
                     } else {
-                        supportActionBar?.subtitle = "Ход соперника..."
+                        val opponentSymbol = if (state.isFirstPlayer) "O" else "X"
+                        supportActionBar?.subtitle = "Ход соперника ($opponentSymbol)..."
                     }
                 } else {
                     // Показываем результат игры
