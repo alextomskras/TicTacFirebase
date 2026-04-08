@@ -161,8 +161,6 @@ class GameViewModel(
     private fun observeGameChanges() {
         viewModelScope.launch {
             gameRepository.observeBoardState(gameId).collect { board ->
-                val currentTurnResult = gameRepository.getCurrentTurn(gameId)
-                val currentTurn = if (currentTurnResult is com.example.tictacfirebase.utils.Result.Success) currentTurnResult.data else ""
                 val myName = _gameState.value.currentPlayerName
                 
                 // Обновляем состояние доски
@@ -189,21 +187,25 @@ class GameViewModel(
                 // Проверяем победителя
                 val winResult = checkWin(tempGameState)
                 
+                // Получаем текущий ход из локального состояния (оно обновляется через observeCurrentTurn)
+                // Это предотвращает рассинхронизацию между доской и текущим ходом
+                val currentState = _gameState.value
+                val currentTurn = currentState.currentPlayerName // Будет обновлено через observeCurrentTurn
+                
                 val newStatus = when {
                     winResult != null -> {
                         if (winResult.winner == myName) GameStatus.Won
                         else if (winResult.winner == "Draw") GameStatus.Draw
                         else GameStatus.Lost
                     }
-                    currentTurn == myName -> GameStatus.Playing
                     else -> GameStatus.Playing
                 }
 
                 updateState {
                     copy(
                         boardState = newBoardState,
-                        isMyTurn = currentTurn == myName,
                         gameStatus = newStatus
+                        // isMyTurn обновляется отдельно через observeCurrentTurn для избежания race condition
                     )
                 }
             }
@@ -213,9 +215,11 @@ class GameViewModel(
         viewModelScope.launch {
             gameRepository.observeCurrentTurn(gameId).collect { currentTurn ->
                 val myName = _gameState.value.currentPlayerName
+                val isMyTurn = currentTurn == myName
+                
                 updateState {
                     copy(
-                        isMyTurn = currentTurn == myName
+                        isMyTurn = isMyTurn
                     )
                 }
             }
