@@ -619,7 +619,7 @@ open class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         
-        // Скрываем стандартную кнопку "домой" и используем кастомную иконку overflow
+        // Скрываем стандартную кнопку "домой" - стандартный overflow (три точки) будет показан автоматически
         supportActionBar?.setDisplayHomeAsUpEnabled(false)
         supportActionBar?.setDisplayShowHomeEnabled(false)
         
@@ -631,11 +631,6 @@ open class MainActivity : AppCompatActivity() {
      */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.action_overflow -> {
-                // Открываем меню при нажатии на три полосочки
-                openOptionsMenu()
-                true
-            }
             R.id.action_new_game -> {
                 startNewGame()
                 true
