@@ -11,11 +11,4 @@
         android:title="@string/menu_logout"
         android:icon="@android:drawable/ic_menu_close_clear_cancel"
         app:showAsAction="never" />
-    
-    <!-- Кнопка overflow menu (три полосочки) -->
-    <item
-        android:id="@+id/action_overflow"
-        android:title=""
-        android:icon="@drawable/ic_menu_overflow"
-        app:showAsAction="always" />
 </menu>
