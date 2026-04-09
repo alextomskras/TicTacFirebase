@@ -190,7 +190,8 @@ class GameRepository {
      */
     suspend fun clearGameRequest(userEmail: String): Result<Unit> {
         return runCatchingResult {
-            myRef.child("users").child(userEmail).child("request").setValue(true).await()
+            val splitEmail = userEmail.substringBefore("@")
+            myRef.child("users").child(splitEmail).child("request").removeValue().await()
         }
     }
 
@@ -243,7 +244,7 @@ class GameRepository {
     suspend fun clearUserRequests(userEmail: String): Result<Unit> {
         return runCatchingResult {
             val splitEmail = userEmail.substringBefore("@")
-            myRef.child("users").child(splitEmail).child("request").setValue(true).await()
+            myRef.child("users").child(splitEmail).child("request").removeValue().await()
         }
     }
     
@@ -407,7 +408,7 @@ class GameRepository {
             val nextPlayer = if (currentPlayer == player1) player2 else player1
             
             myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
-            Log.d("GameRepository", "Move made at cell $cellIndex by $playerEmail ($symbol), switched turn from $currentPlayer to $nextPlayer")
+            Log.d("GameRepository", "Move made at cell $cellId by $playerEmail ($symbol), switched turn from $currentPlayer to $nextPlayer")
         }
     }
     

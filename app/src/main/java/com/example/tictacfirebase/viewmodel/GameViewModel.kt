@@ -120,15 +120,20 @@ class GameViewModel(
             
             if (sessionInfoResult is com.example.tictacfirebase.utils.Result.Success) {
                 val sessionInfo = sessionInfoResult.data
-                val myName = sessionInfo.player1
-                val opponentName = sessionInfo.player2
+                // Определяем текущего пользователя из состояния или из сессии
+                val myName = _gameState.value.currentPlayerName.ifEmpty { 
+                    // Если имя еще не установлено, пытаемся определить по email из активности
+                    // В этом случае берем player1 как текущего игрока (для отправителя запроса)
+                    sessionInfo.player1 
+                }
+                val opponentName = if (myName == sessionInfo.player1) sessionInfo.player2 else sessionInfo.player1
                 val firstPlayer = sessionInfo.firstPlayer
                 val currentTurn = sessionInfo.currentTurn
                 
                 // Определяем кто есть кто относительно текущего пользователя
                 // player1 в базе - это первый игрок (X), player2 - второй игрок (O)
                 // Нам нужно определить: являюсь ли я player1 или player2
-                val amIPlayer1 = (myName == _gameState.value.currentPlayerName)
+                val amIPlayer1 = (myName == sessionInfo.player1)
                 
                 // Загружаем аватарки (асинхронно, не блокируя основной поток)
                 val myAvatarResult = gameRepository.getUserProfileImage(myName)
@@ -223,15 +228,39 @@ class GameViewModel(
         // Отдельное наблюдение за изменениями текущего хода для быстрого обновления UI
         viewModelScope.launch {
             gameRepository.observeCurrentTurn(gameId).collect { currentTurn ->
-                val myName = _gameState.value.currentPlayerName
+                val currentState = _gameState.value
+                // Определяем имя текущего пользователя - берем из состояния если уже установлено
+                var myName = currentState.currentPlayerName
+                
+                // Если имя еще не установлено, пытаемся определить из сессии
+                if (myName.isEmpty() && currentTurn.isNotEmpty()) {
+                    // Получаем информацию о сессии чтобы определить кто есть кто
+                    val sessionInfoResult = gameRepository.getSessionInfo(gameId)
+                    if (sessionInfoResult is com.example.tictacfirebase.utils.Result.Success) {
+                        val sessionInfo = sessionInfoResult.data
+                        // Предполагаем что текущий пользователь это player1 если его ход или он первый игрок
+                        myName = sessionInfo.player1.ifEmpty { sessionInfo.firstPlayer }
+                        
+                        // Обновляем opponentName и isFirstPlayer
+                        val opponentName = sessionInfo.player2
+                        val amIPlayer1 = (myName == sessionInfo.player1)
+                        
+                        updateState {
+                            copy(
+                                currentPlayerName = myName,
+                                opponentName = opponentName,
+                                isFirstPlayer = amIPlayer1,
+                                isMyTurn = currentTurn == myName
+                            )
+                        }
+                        return@collect
+                    }
+                }
+                
                 val isMyTurn = currentTurn == myName
                 
                 updateState {
-                    copy(
-                        isMyTurn = isMyTurn,
-                        // Обновляем currentPlayerName и opponentName из currentTurn если они еще не установлены
-                        currentPlayerName = if (_gameState.value.currentPlayerName.isEmpty()) currentTurn else _gameState.value.currentPlayerName
-                    )
+                    copy(isMyTurn = isMyTurn)
                 }
             }
         }
