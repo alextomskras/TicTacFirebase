@@ -280,6 +280,18 @@ open class MainActivity : AppCompatActivity() {
                     )
                 }
                 
+                // Блокируем/разблокируем кнопки в зависимости от чьего хода и статуса игры
+                val canMakeMove = state.isMyTurn && state.gameStatus == com.example.tictacfirebase.model.GameStatus.Playing && state.isOnline
+                bu1.isEnabled = canMakeMove && bu1.text.isEmpty()
+                bu2.isEnabled = canMakeMove && bu2.text.isEmpty()
+                bu3.isEnabled = canMakeMove && bu3.text.isEmpty()
+                bu4.isEnabled = canMakeMove && bu4.text.isEmpty()
+                bu5.isEnabled = canMakeMove && bu5.text.isEmpty()
+                bu6.isEnabled = canMakeMove && bu6.text.isEmpty()
+                bu7.isEnabled = canMakeMove && bu7.text.isEmpty()
+                bu8.isEnabled = canMakeMove && bu8.text.isEmpty()
+                bu9.isEnabled = canMakeMove && bu9.text.isEmpty()
+                
                 // Обновляем аватарки игроков - постоянно обновляем чтобы не пропадали
                 state.playerAvatarUrl?.let { url ->
                     // player1 avatar можно добавить если есть imageViewUser1
@@ -334,19 +346,7 @@ open class MainActivity : AppCompatActivity() {
      */
     private fun showNoInternetOverlay(show: Boolean) {
         noInternetOverlay.visibility = if (show) View.VISIBLE else View.GONE
-        // Блокируем все UI элементы когда нет интернета
-        bu1.isEnabled = !show
-        bu2.isEnabled = !show
-        bu3.isEnabled = !show
-        bu4.isEnabled = !show
-        bu5.isEnabled = !show
-        bu6.isEnabled = !show
-        bu7.isEnabled = !show
-        bu8.isEnabled = !show
-        bu9.isEnabled = !show
-        buRequest.isEnabled = !show
-        buAcceptEvent.isEnabled = !show && buAcceptEvent.tag == "enabled"
-        etEmail.isEnabled = !show
+        // Блокируем все UI элементы когда нет интернета - остальное управляется через setupGameObserver
     }
     
     /**
