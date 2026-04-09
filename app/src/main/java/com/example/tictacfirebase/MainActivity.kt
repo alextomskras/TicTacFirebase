@@ -306,9 +306,22 @@ open class MainActivity : AppCompatActivity() {
                 }
                 state.opponentAvatarUrl?.let { url ->
                     if (url.isNotEmpty()) {
-                        imageViewUser2.load(url)
+                        imageViewUser2.load(url) {
+                            crossfade(true)
+                            placeholder(R.drawable.ic_fire_emoji)
+                            error(R.drawable.ic_fire_emoji)
+                        }
                     }
                 }
+                
+                // Показываем аватар и имя противника только когда игра активна
+                val shouldShowOpponentInfo = state.gameStatus == com.example.tictacfirebase.model.GameStatus.Playing || 
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.Won ||
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.Lost ||
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.Draw ||
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.OpponentLeft
+                player2TextView.visibility = if (shouldShowOpponentInfo && state.opponentName.isNotEmpty()) View.VISIBLE else View.GONE
+                imageViewUser2.visibility = if (shouldShowOpponentInfo && state.opponentName.isNotEmpty()) View.VISIBLE else View.GONE
                 
                 // Обновляем индикатор чей ход и статус игры
                 if (state.gameStatus == com.example.tictacfirebase.model.GameStatus.Playing) {
@@ -577,7 +590,7 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_SHORT).show()
         
         // Отправляем событие в ViewModel для сброса состояния игры
-        gameViewModel.onEvent(UiEvent.StartNewGame())
+        gameViewModel.onEvent(UiEvent.StartNewGame)
     }
 
     /**
