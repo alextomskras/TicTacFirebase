@@ -191,7 +191,7 @@ class GameViewModel(
                 }
                 
                 // Создаем временное состояние для проверки победы
-                val tempGameState = com.example.tictacfirebase.game.GameState(
+                val tempGameState = com.example.tictacfirebase.game.GameBoardState(
                     player1Moves = player1Moves,
                     player2Moves = player2Moves
                 )
@@ -277,10 +277,10 @@ class GameViewModel(
     
     /**
      * Проверка победителя на основе состояния игры
-     * @param gameState Состояние игры с ходами игроков
+     * @param gameState Состояние игровой доски с ходами игроков
      * @return Результат проверки (null если игра продолжается, иначе объект с победителем)
      */
-    private fun checkWin(gameState: com.example.tictacfirebase.game.GameState): WinResult? {
+    private fun checkWin(gameState: com.example.tictacfirebase.game.GameBoardState): WinResult? {
         val winningCombinations = listOf(
             listOf(1, 2, 3), listOf(4, 5, 6), listOf(7, 8, 9), // Ряды
             listOf(1, 4, 7), listOf(2, 5, 8), listOf(3, 6, 9), // Колонки

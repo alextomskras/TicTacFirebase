@@ -1,9 +1,10 @@
 package com.example.tictacfirebase.game
 
 /**
- * Модель состояния игры
+ * Модель состояния игровой доски (ходы игроков)
+ * Используется GameManager для проверки победителя
  */
-data class GameState(
+data class GameBoardState(
     val player1Moves: List<Int> = emptyList(),
     val player2Moves: List<Int> = emptyList(),
     val activePlayer: Int = 1, // 1 или 2
@@ -135,8 +136,8 @@ class GameManager {
     /**
      * Получение текущего состояния игры
      */
-    fun getGameState(): GameState {
-        return GameState(
+    fun getGameState(): GameBoardState {
+        return GameBoardState(
             player1Moves = player1Moves.toList(),
             player2Moves = player2Moves.toList(),
             activePlayer = activePlayer,

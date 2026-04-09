@@ -1,21 +1,25 @@
 ```
-# Compiled and build artifacts
+# Gradle
+.gradle/
+
+# Compiled and binary files
 *.class
 *.o
 *.obj
 *.out
-build/
+
 # Dependencies
-__pycache__/
-.mypy_cache/
-.pytest_cache/
+build/
+target/
+
 # Logs and temp files
 *.log
 *.tmp
-*.swp
+
 # Editors
-.vscode/
 .idea/
+.vscode/
+
 # Environment
 .env
 .env.local
