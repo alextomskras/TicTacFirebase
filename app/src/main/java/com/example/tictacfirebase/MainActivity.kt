@@ -1,6 +1,7 @@
 package com.example.tictacfirebase
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
@@ -9,6 +10,8 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
+import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
@@ -48,6 +51,7 @@ open class MainActivity : AppCompatActivity() {
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
     private lateinit var noInternetOverlay: android.widget.FrameLayout
+    private lateinit var btnMenu: ImageButton
     
     // GameViewModel для управления состоянием игры и сетью
     private lateinit var gameViewModel: GameViewModel
@@ -78,6 +82,10 @@ open class MainActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
         noInternetOverlay = findViewById(R.id.noInternetOverlay)
+        btnMenu = findViewById(R.id.btnMenu)
+        
+        // Настройка выпадающего меню
+        setupPopupMenu()
         
         // Инициализация GameRepository для передачи в ViewModel
         val gameRepository = GameRepository()
@@ -492,6 +500,32 @@ open class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * Настройка выпадающего меню с кнопками "Новая игра" и "Выйти"
+     */
+    private fun setupPopupMenu() {
+        btnMenu.setOnClickListener { view ->
+            val popup = PopupMenu(this, view)
+            popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
+            
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    R.id.action_new_game -> {
+                        startNewGame()
+                        true
+                    }
+                    R.id.action_logout -> {
+                        buLogoutEvent(view)
+                        true
+                    }
+                    else -> false
+                }
+            }
+            
+            popup.show()
+        }
+    }
+    
+    /**
      * Обработчик кнопки выхода (logout)
      * Выходит из аккаунта и перенаправляет на экран регистрации
      */
@@ -509,6 +543,43 @@ open class MainActivity : AppCompatActivity() {
         finish()
     }
     
+    /**
+     * Запуск новой игры - сбрасывает состояние и пересоздает игровое поле
+     */
+    private fun startNewGame() {
+        Log.d(TAG, "Starting new game")
+        
+        // Сбрасываем доску
+        bu1.text = ""
+        bu2.text = ""
+        bu3.text = ""
+        bu4.text = ""
+        bu5.text = ""
+        bu6.text = ""
+        bu7.text = ""
+        bu8.text = ""
+        bu9.text = ""
+        
+        // Сбрасываем статус в заголовке
+        supportActionBar?.subtitle = getString(R.string.waiting_for_opponent)
+        
+        // Скрываем аватар противника
+        player2TextView.visibility = View.GONE
+        imageViewUser2.visibility = View.GONE
+        
+        // Очищаем поле ввода email
+        etEmail.text.clear()
+        
+        // Деактивируем кнопку принятия
+        buAcceptEvent.isEnabled = false
+        
+        // Показываем toast
+        Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_SHORT).show()
+        
+        // Отправляем событие в ViewModel для сброса состояния игры
+        gameViewModel.onEvent(UiEvent.StartNewGame())
+    }
+
     /**
      * Загрузка аватара противника из Firebase
      */

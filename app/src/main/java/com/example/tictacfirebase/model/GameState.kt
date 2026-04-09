@@ -43,6 +43,7 @@ sealed class UiEvent {
     data class CellSelected(val cellIndex: Int) : UiEvent()
     data class SendGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
     data class AcceptGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
+    object StartNewGame : UiEvent() // Событие для запуска новой игры
 }
 
 /**

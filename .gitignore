@@ -1,23 +1,43 @@
 ```
-# Compiled and build artifacts
+# Build and intermediate files
 *.class
-*.o
-*.obj
-*.out
+*.dex
+*.oat
+*.odex
+*.so
+*.aar
+
+# Gradle
+.gradle/
 build/
-# Dependencies
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-# Editors
-.vscode/
+intermediates/
+outputs/
+
+# Android Studio
 .idea/
+*.iml
+*.iws
+*.apk
+*.ap_
+local.properties
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Logs
+*.log
+
 # Environment
 .env
 .env.local
 *.env.*
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.egg-info/
 ```
