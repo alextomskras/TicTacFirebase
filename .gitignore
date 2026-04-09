@@ -1,42 +1,69 @@
-```kotlin
-# Kotlin/Android specific
+```
+# Kotlin/Android build artifacts
 *.class
+*.dex
 *.jar
-*.war
-*.ear
-*.nar
-*.kotlin_metadata
+*.aar
 
-# Android build artifacts
+# Android build directories
 build/
 .gradle/
-captures/
+.app/
+.externalNativeBuild/
+.cxx/
 
-# Local configuration file (sdk path, etc)
-local.properties
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
 
-# Gradle
-.gradle/
-*/build/
-
-# Android Studio
+# IDE files
+.vscode/
 .idea/
-*.iml
-*.iws
-*.hprof
-*.pyc
-*.pyo
-*.rbc
-*.yarb
-*~
+*.swp
+*.swo
+*.tmp
+
+# System files
 .DS_Store
 Thumbs.db
-
-# Environment variable files
 .env
 .env.local
 *.env.*
 
 # Logs
 *.log
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```

@@ -8,10 +8,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
-import android.widget.ImageButton
-import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
@@ -51,7 +51,6 @@ open class MainActivity : AppCompatActivity() {
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
     private lateinit var noInternetOverlay: android.widget.FrameLayout
-    private lateinit var btnMenu: ImageButton
     
     // GameViewModel для управления состоянием игры и сетью
     private lateinit var gameViewModel: GameViewModel
@@ -82,10 +81,11 @@ open class MainActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
         noInternetOverlay = findViewById(R.id.noInternetOverlay)
-        btnMenu = findViewById(R.id.btnMenu)
         
-        // Настройка выпадающего меню
-        setupPopupMenu()
+        // Настройка ActionBar с меню
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setHomeAsUpIndicator(R.drawable.abc_ic_menu_overflow_material)
+        supportActionBar?.setDisplayShowHomeEnabled(true)
         
         // Инициализация GameRepository для передачи в ViewModel
         val gameRepository = GameRepository()
@@ -511,32 +511,6 @@ open class MainActivity : AppCompatActivity() {
         // Отправляем событие в ViewModel
         gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
     }
-
-    /**
-     * Настройка выпадающего меню с кнопками "Новая игра" и "Выйти"
-     */
-    private fun setupPopupMenu() {
-        btnMenu.setOnClickListener { view ->
-            val popup = PopupMenu(this, view)
-            popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
-            
-            popup.setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    R.id.action_new_game -> {
-                        startNewGame()
-                        true
-                    }
-                    R.id.action_logout -> {
-                        buLogoutEvent(view)
-                        true
-                    }
-                    else -> false
-                }
-            }
-            
-            popup.show()
-        }
-    }
     
     /**
      * Обработчик кнопки выхода (logout)
@@ -642,5 +616,33 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_LONG).show()
     }
 
+    /**
+     * Создание меню ActionBar
+     */
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
+    }
+
+    /**
+     * Обработка выбора пунктов меню
+     */
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                // Кнопка "три полосочки" - ничего не делаем, просто открываем меню
+                true
+            }
+            R.id.action_new_game -> {
+                startNewGame()
+                true
+            }
+            R.id.action_logout -> {
+                buLogoutEvent(findViewById(android.R.id.content))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
 
 }
