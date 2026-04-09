@@ -14,6 +14,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.ActionBar
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.tictacfirebase.model.UiEvent
@@ -613,9 +614,6 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_LONG).show()
     }
 
-    /**
-     * Создание меню ActionBar
-     */
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         
