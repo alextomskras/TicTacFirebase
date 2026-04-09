@@ -82,10 +82,7 @@ open class MainActivity : AppCompatActivity() {
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
         noInternetOverlay = findViewById(R.id.noInternetOverlay)
         
-        // Настройка ActionBar с меню
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_more)
-        supportActionBar?.setDisplayShowHomeEnabled(true)
+        // Настройка ActionBar будет выполнена в onCreateOptionsMenu
         
         // Инициализация GameRepository для передачи в ViewModel
         val gameRepository = GameRepository()
@@ -621,6 +618,11 @@ open class MainActivity : AppCompatActivity() {
      */
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
+        
+        // Скрываем стандартную кнопку "домой" и используем кастомную иконку overflow
+        supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        supportActionBar?.setDisplayShowHomeEnabled(false)
+        
         return true
     }
 
@@ -629,8 +631,9 @@ open class MainActivity : AppCompatActivity() {
      */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            android.R.id.home -> {
-                // Кнопка "три полосочки" - ничего не делаем, просто открываем меню
+            R.id.action_overflow -> {
+                // Открываем меню при нажатии на три полосочки
+                openOptionsMenu()
                 true
             }
             R.id.action_new_game -> {
