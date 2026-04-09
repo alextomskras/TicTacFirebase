@@ -316,7 +316,33 @@ class GameViewModel(
             is UiEvent.RestartGameClicked -> restartGame()
             is UiEvent.SendGameRequest -> sendGameRequest(event.fromEmail, event.toEmail)
             is UiEvent.AcceptGameRequest -> acceptGameRequest(event.fromEmail, event.toEmail)
-            else -> { /* Другие события обрабатываются в MainActivity */ }
+            is UiEvent.StartNewGame -> startNewGame()
+        }
+    }
+
+    /**
+     * Запуск новой игры - сброс состояния для начала игры с новым соперником
+     */
+    private fun startNewGame() {
+        viewModelScope.launch {
+            // Сбрасываем состояние игры
+            updateState { 
+                copy(
+                    sessionId = null,
+                    boardState = List(9) { "" },
+                    gameStatus = GameStatus.WaitingForOpponent,
+                    isMyTurn = false,
+                    isFirstPlayer = false,
+                    currentPlayerName = "",
+                    opponentName = "",
+                    playerAvatarUrl = null,
+                    opponentAvatarUrl = null,
+                    errorMessage = null
+                ) 
+            }
+            
+            // Показываем toast через эффект
+            sendEffect(UiEffect.ShowToast("Новая игра готова!"))
         }
     }
 

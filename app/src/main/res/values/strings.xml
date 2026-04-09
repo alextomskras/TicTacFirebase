@@ -25,4 +25,9 @@
     <string name="error_processing_request">Error processing request: %1$s</string>
     <string name="player2_label">Player2-%1$s</string>
     <string name="restart_game_message">RESTART the game</string>
+    
+    <!-- Menu items -->
+    <string name="menu_logout">Выйти</string>
+    <string name="menu_new_game">Новая игра</string>
+    <string name="menu_profile">Профиль</string>
 </resources>
