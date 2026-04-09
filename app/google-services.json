@@ -1,14 +1,14 @@
 {
   "project_info": {
-    "project_number": "YOUR_PROJECT_NUMBER",
-    "firebase_url": "YOUR_FIREBASE_URL",
-    "project_id": "YOUR_PROJECT_ID",
-    "storage_bucket": "YOUR_STORAGE_BUCKET"
+    "project_number": "793202519353",
+    "firebase_url": "https://tictacfirebase-749a6.firebaseio.com",
+    "project_id": "tictacfirebase-749a6",
+    "storage_bucket": "tictacfirebase-749a6.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "YOUR_APP_ID",
+        "mobilesdk_app_id": "1:793202519353:android:50756e48589355b6",
         "android_client_info": {
           "package_name": "com.example.tictacfirebase"
         }
@@ -16,7 +16,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "YOUR_API_KEY"
+          "current_key": "AIzaSyBe41l69ujxNPVwAoxw69NXeHNKiLPfxU4"
         }
       ],
       "services": {
