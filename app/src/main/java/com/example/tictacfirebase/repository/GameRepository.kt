@@ -1,5 +1,6 @@
 package com.example.tictacfirebase.repository
 
+import android.util.Log
 import com.example.tictacfirebase.utils.Result
 import com.example.tictacfirebase.utils.runCatchingResult
 import com.google.firebase.database.DataSnapshot
@@ -31,11 +32,69 @@ class GameRepository {
     
     /**
      * Отправка запроса на игру другому пользователю
+     * ПРОВЕРЯЕТ: нет ли уже активного приглашения от этого пользователя
      */
     suspend fun sendGameRequest(fromUser: String, toUser: String): Result<Unit> {
         return runCatchingResult {
             val splitToUser = toUser.substringBefore("@")
+            val splitFromUser = fromUser.substringBefore("@")
+            
+            // Проверяем существование пользователя и получаем его токен
+            val tokenSnapshot = myRef.child("users").child(splitToUser).child("newToken").get().await()
+            val recipientToken = tokenSnapshot.value as? String
+            
+            if (recipientToken == null) {
+                Log.w("GameRepository", "Token not found for user: $splitToUser. User may not be online or registered.")
+                throw Exception("Пользователь $toUser не найден или не в сети")
+            }
+            
+            // ВАЖНО: Проверяем, нет ли уже активного запроса от fromUser к toUser
+            // Это предотвращает дублирование приглашений
+            val existingRequestsSnapshot = myRef.child("users").child(splitToUser).child("request").get().await()
+            var alreadyInvited = false
+            existingRequestsSnapshot.children.forEach { child ->
+                if (child.value.toString() == fromUser) {
+                    alreadyInvited = true
+                    Log.d("GameRepository", "User $fromUser already invited $toUser")
+                }
+            }
+            
+            if (alreadyInvited) {
+                Log.d("GameRepository", "Skipping duplicate invitation from $fromUser to $toUser")
+                return@runCatchingResult // Не выбрасываем ошибку, просто ничего не делаем
+            }
+            
+            // Также проверяем, нет ли встречного приглашения (toUser уже приглашал fromUser)
+            val reverseRequestsSnapshot = myRef.child("users").child(splitFromUser).child("request").get().await()
+            var reverseInvitationExists = false
+            reverseRequestsSnapshot.children.forEach { child ->
+                if (child.value.toString() == toUser) {
+                    reverseInvitationExists = true
+                    Log.d("GameRepository", "Reverse invitation exists: $toUser already invited $fromUser")
+                }
+            }
+            
+            if (reverseInvitationExists) {
+                Log.w("GameRepository", "Cannot send request: $toUser already invited $fromUser. Please accept their request instead.")
+                throw Exception("$toUser уже пригласил вас. Примите их приглашение вместо отправки нового.")
+            }
+            
+            Log.d("GameRepository", "Found token for user $splitToUser, sending game request")
+            
+            // Сохраняем запрос в БД
             myRef.child("users").child(splitToUser).child("request").push().setValue(fromUser).await()
+            
+            // Сохраняем данные для FCM в отдельном узле для Cloud Function
+            val fcmData = mapOf(
+                "fromUser" to fromUser,
+                "toUser" to toUser,
+                "token" to recipientToken,
+                "title" to "Запрос на игру",
+                "body" to "$fromUser приглашает вас сыграть в крестики-нолики!",
+                "timestamp" to System.currentTimeMillis()
+            )
+            myRef.child("fcm_queue").push().setValue(fcmData).await()
+            Log.d("GameRepository", "FCM data saved to queue for Cloud Function processing")
         }
     }
     
@@ -46,7 +105,9 @@ class GameRepository {
     suspend fun createGameSession(sessionID: String): Result<Unit> {
         return runCatchingResult {
             // Очищаем только нашу сессию, а не все PlayerOnline
+            // Это удаляет старые ходы, но setupGameSession установит player1, player2, firstPlayer, currentTurn заново
             myRef.child("PlayerOnline").child(sessionID).removeValue().await()
+            Log.d("GameRepository", "Game session created/cleared: $sessionID")
         }
     }
     
@@ -129,7 +190,8 @@ class GameRepository {
      */
     suspend fun clearGameRequest(userEmail: String): Result<Unit> {
         return runCatchingResult {
-            myRef.child("users").child(userEmail).child("request").setValue(true).await()
+            val splitEmail = userEmail.substringBefore("@")
+            myRef.child("users").child(splitEmail).child("request").removeValue().await()
         }
     }
 
@@ -182,7 +244,7 @@ class GameRepository {
     suspend fun clearUserRequests(userEmail: String): Result<Unit> {
         return runCatchingResult {
             val splitEmail = userEmail.substringBefore("@")
-            myRef.child("users").child(splitEmail).child("request").setValue(true).await()
+            myRef.child("users").child(splitEmail).child("request").removeValue().await()
         }
     }
     
@@ -197,7 +259,10 @@ class GameRepository {
                     val board = Array<String?>(9) { null }
                     
                     snapshot.children.forEach { child ->
-                        child.key?.toIntOrNull()?.let { index ->
+                        val key = child.key
+                        // Пропускаем служебные ключи (firstPlayer, currentTurn, player1, player2 и т.д.)
+                        if (key != null && key.toIntOrNull() != null) {
+                            val index = key.toInt()
                             if (index in 1..9) {
                                 board[index - 1] = child.value.toString()
                             }
@@ -277,41 +342,191 @@ class GameRepository {
     }
     
     /**
-     * Перезапуск игры (очистка доски)
+     * Перезапуск игры (очистка доски с сохранением игроков)
      */
     suspend fun restartGame(sessionID: String): Result<Unit> {
         return runCatchingResult {
-            // Очищаем все ходы в сессии
-            myRef.child("PlayerOnline").child(sessionID).removeValue().await()
-            // Можно добавить установку флага currentTurn и firstPlayer заново
+            // Получаем текущих игроков перед очисткой
+            val player1Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
+            val player2Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
+            val firstPlayerSnapshot = myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").get().await()
+            
+            val player1 = player1Snapshot.value as? String ?: ""
+            val player2 = player2Snapshot.value as? String ?: ""
+            val firstPlayer = firstPlayerSnapshot.value as? String ?: player1
+            
+            // Очищаем только ходы (клетки 1-9), но сохраняем информацию об игроках
+            for (i in 1..9) {
+                myRef.child("PlayerOnline").child(sessionID).child(i.toString()).removeValue().await()
+            }
+            
+            // Восстанавливаем currentTurn - ход переходит к первому игроку
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(firstPlayer).await()
+            
+            Log.d("GameRepository", "Game restarted: player1=$player1, player2=$player2, firstPlayer=$firstPlayer, currentTurn=$firstPlayer")
         }
     }
     
     /**
-     * Обновление состояния доски
+     * Настройка игровой сессии после создания
+     * Устанавливает первого игрока, текущий ход и имена игроков
+     */
+    suspend fun setupGameSession(sessionID: String, player1: String, player2: String): Result<Unit> {
+        return runCatchingResult {
+            // Первый игрок получает "X" и ходит первым
+            myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").setValue(player1).await()
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(player1).await()
+            myRef.child("PlayerOnline").child(sessionID).child("player1").setValue(player1).await()
+            myRef.child("PlayerOnline").child(sessionID).child("player2").setValue(player2).await()
+            Log.d("GameRepository", "Game session setup: firstPlayer=$player1, currentTurn=$player1")
+        }
+    }
+    
+    /**
+     * Совершение хода в игре
+     * @param sessionID Уникальный идентификатор сессии
+     * @param cellId Индекс клетки (1-9) - как хранится в БД
+     * @param playerEmail Email игрока
+     * @param symbol Символ игрока (X или O)
+     */
+    suspend fun makeMove(sessionID: String, cellId: Int, playerEmail: String, symbol: String): Result<Unit> {
+        return runCatchingResult {
+            // Сохраняем ход в базу (Firebase использует ключи 1-9)
+            // cellId уже приходит в формате 1-9 из ViewModel
+            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(symbol).await()
+            
+            // Переключаем текущий ход на следующего игрока
+            val currentTurnSnapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()
+            val currentPlayer = currentTurnSnapshot.value as? String ?: ""
+            
+            val player1Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
+            val player1 = player1Snapshot.value as? String ?: ""
+            
+            val player2Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
+            val player2 = player2Snapshot.value as? String ?: ""
+            
+            val nextPlayer = if (currentPlayer == player1) player2 else player1
+            
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
+            Log.d("GameRepository", "Move made at cell $cellId by $playerEmail ($symbol), switched turn from $currentPlayer to $nextPlayer")
+        }
+    }
+    
+    /**
+     * Обновление состояния доски (устаревший метод, используется makeMove)
+     * После обновления автоматически переключает currentTurn на следующего игрока
      */
     suspend fun updateBoardState(sessionID: String, board: List<String>): Result<Unit> {
         return runCatchingResult {
-            // Обновляем каждый элемент доски
-            board.forEachIndexed { index, value ->
-                if (value.isNotEmpty()) {
-                    myRef.child("PlayerOnline").child(sessionID).child((index + 1).toString()).setValue(value).await()
-                }
-            }
+            // Получаем текущего игрока из локальных данных (передается из ViewModel)
+            // Этот метод оставлен для обратной совместимости, но лучше использовать makeMove
+            val currentTurnResult = getCurrentTurn(sessionID)
+            val currentPlayer = if (currentTurnResult is Result.Success) currentTurnResult.data else ""
+            
+            val player1Result = getPlayer1(sessionID)
+            val player1 = if (player1Result is Result.Success) player1Result.data else ""
+            
+            val player2Result = getPlayer2(sessionID)
+            val player2 = if (player2Result is Result.Success) player2Result.data else ""
+            
+            val nextPlayer = if (currentPlayer == player1) player2 else player1
+            
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
+            Log.d("GameRepository", "Board state updated, switched turn from $currentPlayer to $nextPlayer")
         }
     }
+    
+    /**
+     * Получение первого игрока из сессии
+     */
+    suspend fun getPlayer1(sessionID: String): Result<String> {
+        return runCatchingResult {
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
+            snapshot.value as? String ?: ""
+        }
+    }
+    
+    /**
+     * Получение второго игрока из сессии
+     */
+    suspend fun getPlayer2(sessionID: String): Result<String> {
+        return runCatchingResult {
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
+            snapshot.value as? String ?: ""
+        }
+    }
+    
+    /**
+     * Наблюдение за изменениями текущего хода в реальном времени
+     */
+    fun observeCurrentTurn(sessionID: String): Flow<String> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    val currentTurnSnapshot = snapshot.child("currentTurn")
+                    val currentTurn = currentTurnSnapshot.value as? String ?: ""
+                    trySend(currentTurn)
+                } catch (e: Exception) {
+                    println("observeCurrentTurn error: $e")
+                    trySend("")
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                println("observeCurrentTurn cancelled: ${error.message}")
+                trySend("")
+            }
+        }
+        
+        myRef.child("PlayerOnline").child(sessionID).addValueEventListener(listener)
+        
+        awaitClose {
+            myRef.child("PlayerOnline").child(sessionID).removeEventListener(listener)
+        }
+    }
+    
+    /**
+     * Получение полной информации о сессии
+     */
+    suspend fun getSessionInfo(sessionID: String): Result<SessionInfo> {
+        return runCatchingResult {
+            val snapshot = myRef.child("PlayerOnline").child(sessionID).get().await()
+            val firstPlayer = snapshot.child("firstPlayer").value as? String ?: ""
+            val currentTurn = snapshot.child("currentTurn").value as? String ?: ""
+            val player1 = snapshot.child("player1").value as? String ?: ""
+            val player2 = snapshot.child("player2").value as? String ?: ""
+            
+            SessionInfo(
+                firstPlayer = firstPlayer,
+                currentTurn = currentTurn,
+                player1 = player1,
+                player2 = player2
+            )
+        }
+    }
+    
+    /**
+     * Информация о сессии
+     */
+    data class SessionInfo(
+        val firstPlayer: String,
+        val currentTurn: String,
+        val player1: String,
+        val player2: String
+    )
     
     /**
      * Получение имен игроков из сессии
      */
     suspend fun getPlayerNames(sessionID: String): Result<Pair<String, String>> {
         return runCatchingResult {
-            // В реальном приложении нужно хранить имена игроков в сессии
-            // Здесь заглушка - нужно доработать структуру данных
-            val snapshot = myRef.child("PlayerOnline").child(sessionID).get().await()
-            // Извлекаем имена из sessionID (формат: player1player2)
-            // Это упрощенная логика, лучше хранить явно в базе
-            Pair("", "")
+            val player1Result = getPlayer1(sessionID)
+            val player2Result = getPlayer2(sessionID)
+            
+            val player1 = if (player1Result is Result.Success) player1Result.data else ""
+            val player2 = if (player2Result is Result.Success) player2Result.data else ""
+            
+            Pair(player1, player2)
         }
     }
 }

@@ -1,17 +1,23 @@
 package com.example.tictacfirebase
 
-
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
+import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
-import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.example.tictacfirebase.utils.AppConstants
 import com.example.tictacfirebase.utils.NetworkMonitor
 import com.example.tictacfirebase.utils.splitEmail
@@ -19,66 +25,74 @@ import com.example.tictacfirebase.utils.splitEmailFull
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import coil.load
-import kotlinx.coroutines.flow.collect
+import com.example.tictacfirebase.model.UiEffect
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Random
 
 open class MainActivity : AppCompatActivity() {
 
     companion object {
-        val TAG = AppConstants.TAG
+        private const val TAG = "TicTacFirebase"
+        private const val SENDER_ID = "793202519353"
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
     }
 
-    private val SENDER_ID = getString(R.string.SENDER_ID)
     private val random = Random()
 
     var myEmail: String? = null
 
-    lateinit var tokenID: MyFirebaseMessagingService
     lateinit var mFirebaseAnalytics: FirebaseAnalytics
     
     // UI Views
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
     private lateinit var noInternetOverlay: android.widget.FrameLayout
+    private lateinit var btnMenu: ImageButton
     
     // GameViewModel для управления состоянием игры и сетью
     private lateinit var gameViewModel: GameViewModel
     
     // Image views
-    private val image_View_user2 by lazy { findViewById<de.hdodenhof.circleimageview.CircleImageView>(com.example.tictacfirebase.R.id.image_View_user2) }
-    private val player2_text_View by lazy { findViewById<android.widget.TextView>(com.example.tictacfirebase.R.id.player2_text_View) }
-    private val buAcceptEvent by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.buAcceptEvent) }
-    private val burequest by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.burequest) }
-    private val etEmail by lazy { findViewById<android.widget.EditText>(com.example.tictacfirebase.R.id.etEmail) }
-    private val bu1 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu1) }
-    private val bu2 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu2) }
-    private val bu3 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu3) }
-    private val bu4 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu4) }
-    private val bu5 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu5) }
-    private val bu6 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu6) }
-    private val bu7 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu7) }
-    private val bu8 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu8) }
-    private val bu9 by lazy { findViewById<Button>(com.example.tictacfirebase.R.id.bu9) }
+    private val imageViewUser2 by lazy { findViewById<de.hdodenhof.circleimageview.CircleImageView>(R.id.image_View_user2) }
+    private val player2TextView by lazy { findViewById<android.widget.TextView>(R.id.player2_text_View) }
+    private val buAcceptEvent by lazy { findViewById<Button>(R.id.buAcceptEvent) }
+    private val buRequest by lazy { findViewById<Button>(R.id.burequest) }
+    private val etEmail by lazy { findViewById<android.widget.EditText>(R.id.etEmail) }
+    private val bu1 by lazy { findViewById<Button>(R.id.bu1) }
+    private val bu2 by lazy { findViewById<Button>(R.id.bu2) }
+    private val bu3 by lazy { findViewById<Button>(R.id.bu3) }
+    private val bu4 by lazy { findViewById<Button>(R.id.bu4) }
+    private val bu5 by lazy { findViewById<Button>(R.id.bu5) }
+    private val bu6 by lazy { findViewById<Button>(R.id.bu6) }
+    private val bu7 by lazy { findViewById<Button>(R.id.bu7) }
+    private val bu8 by lazy { findViewById<Button>(R.id.bu8) }
+    private val bu9 by lazy { findViewById<Button>(R.id.bu9) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        
+
+        // Запрос разрешения на уведомления для Android 13+
+        requestNotificationPermission()
         // Инициализация UI элементов
-        progressBar = findViewById(com.example.tictacfirebase.R.id.progressBar)
-        tvConnectionStatus = findViewById(com.example.tictacfirebase.R.id.tvConnectionStatus)
-        noInternetOverlay = findViewById(com.example.tictacfirebase.R.id.noInternetOverlay)
+        progressBar = findViewById(R.id.progressBar)
+        tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
+        noInternetOverlay = findViewById(R.id.noInternetOverlay)
+        btnMenu = findViewById(R.id.btnMenu)
+        
+        // Настройка выпадающего меню
+        setupPopupMenu()
         
         // Инициализация GameRepository для передачи в ViewModel
         val gameRepository = GameRepository()
         
-        //Hide img+player2name
-        player2_text_View.visibility = View.GONE
-        image_View_user2.visibility = View.GONE
+        //Hide img+player name
+        player2TextView.visibility = View.GONE
+        imageViewUser2.visibility = View.GONE
 
         //Block_ACCEPT_BUTTON
         buAcceptEvent.isEnabled = false
@@ -87,9 +101,8 @@ open class MainActivity : AppCompatActivity() {
 
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
-        val channelId = getString(R.string.default_notification_channel_id)
-        val b: Bundle = intent.extras
-        myEmail = b.getString(AppConstants.KEY_EMAIL)
+        val b: Bundle? = intent.extras
+        myEmail = b?.getString(AppConstants.KEY_EMAIL)
         Log.d(TAG, "getExtraEmail: $myEmail")
         supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
         
@@ -108,10 +121,59 @@ open class MainActivity : AppCompatActivity() {
         // Наблюдаем за UI эффектами от ViewModel (toast, навигация)
         setupUiEffectObserver()
         
+        // Наблюдаем за состоянием загрузки из ViewModel
+        setupLoadingObserver()
+        
         // Запускаем прослушивание входящих запросов с использованием lifecycleScope
         setupIncomingRequestsListener()
+        
+        // Наблюдаем за состоянием игры (доска, статус, чей ход) и обновляем UI
+        setupGameObserver()
     }
-    
+
+    /**
+     * Запрос разрешения на отправку уведомлений для Android 13+ (API 33+)
+     */
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+                Log.d(TAG, "Notification permission requested")
+            } else {
+                Log.d(TAG, "Notification permission already granted")
+            }
+        } else {
+            Log.d(TAG, "Android version < 13, notification permission not required")
+        }
+    }
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Notification permission granted")
+                Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.d(TAG, "Notification permission denied")
+                Toast.makeText(
+                    this,
+                    "Notifications disabled - you won't receive game requests",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
     /**
      * Настройка наблюдения за UI эффектами от ViewModel
      * Показывает toast сообщения и обрабатывает навигацию
@@ -120,17 +182,29 @@ open class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             gameViewModel.uiEffect.collect { effect ->
                 when (effect) {
-                    is com.example.tictacfirebase.model.UiEffect.ShowToast -> {
+                    is UiEffect.ShowToast -> {
                         Toast.makeText(this@MainActivity, effect.message, Toast.LENGTH_SHORT).show()
                     }
-                    is com.example.tictacfirebase.model.UiEffect.NavigateTo -> {
+                    is UiEffect.NavigateTo -> {
                         // TODO: Реализовать навигацию
                     }
-                    com.example.tictacfirebase.model.UiEffect.GameEnded -> {
+                    UiEffect.GameEnded -> {
                         // TODO: Показать диалог конца игры
                     }
                     else -> {}
                 }
+            }
+        }
+    }
+    
+    /**
+     * Настройка наблюдения за состоянием загрузки из ViewModel
+     * Показывает/скрывает индикатор загрузки на основе gameState.isLoading
+     */
+    private fun setupLoadingObserver() {
+        lifecycleScope.launch {
+            gameViewModel.gameState.collect { state ->
+                showLoading(state.isLoading)
             }
         }
     }
@@ -148,8 +222,8 @@ open class MainActivity : AppCompatActivity() {
                         Log.d(TAG, "Incoming request from: $requesterEmail")
                         etEmail.setText(requesterEmail)
                         
-                        // Отправляем уведомление (FCM)
-                        perfotmFCMSendMessages()
+                        // FCM уведомление уже было отправлено отправителем запроса в sendGameRequest()
+                        // Здесь просто показываем UI и toast
                         
                         // Активируем кнопку принятия запроса
                         buAcceptEvent.isEnabled = true
@@ -157,7 +231,7 @@ open class MainActivity : AppCompatActivity() {
                         
                         Toast.makeText(
                             this@MainActivity,
-                            "Игрок $requesterEmail хочет сыграть!",
+                            getString(R.string.incoming_request_message, requesterEmail),
                             Toast.LENGTH_LONG
                         ).show()
                         
@@ -168,7 +242,7 @@ open class MainActivity : AppCompatActivity() {
                     Log.e(TAG, "Error processing incoming request: ${e.message}")
                     Toast.makeText(
                         this@MainActivity,
-                        "Ошибка обработки запроса: ${e.message}",
+                        getString(R.string.error_processing_request, e.message),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -180,6 +254,98 @@ open class MainActivity : AppCompatActivity() {
         super.onDestroy()
         // Скрываем индикатор загрузки
         showLoading(false)
+    }
+    
+    /**
+     * Настройка наблюдения за состоянием игры и обновление UI
+     * Обновляет доску, статус игры, аватарки и индикатор хода
+     */
+    private fun setupGameObserver() {
+        lifecycleScope.launch {
+            gameViewModel.gameState.collect { state ->
+                // Обновляем доску
+                state.boardState.forEachIndexed { index, cellValue ->
+                    val button = when (index + 1) {
+                        1 -> bu1
+                        2 -> bu2
+                        3 -> bu3
+                        4 -> bu4
+                        5 -> bu5
+                        6 -> bu6
+                        7 -> bu7
+                        8 -> bu8
+                        9 -> bu9
+                        else -> null
+                    }
+                    button?.text = cellValue
+                    // Применяем цвет в зависимости от символа: О - синий, Х - красный
+                    button?.setTextColor(
+                        when (cellValue) {
+                            "O" -> ContextCompat.getColor(this@MainActivity, R.color.colorO)
+                            "X" -> ContextCompat.getColor(this@MainActivity, R.color.colorX)
+                            else -> ContextCompat.getColor(this@MainActivity, R.color.black)
+                        }
+                    )
+                }
+                
+                // Блокируем/разблокируем кнопки в зависимости от чьего хода и статуса игры
+                val canMakeMove = state.isMyTurn && state.gameStatus == com.example.tictacfirebase.model.GameStatus.Playing && state.isOnline
+                bu1.isEnabled = canMakeMove && bu1.text.isEmpty()
+                bu2.isEnabled = canMakeMove && bu2.text.isEmpty()
+                bu3.isEnabled = canMakeMove && bu3.text.isEmpty()
+                bu4.isEnabled = canMakeMove && bu4.text.isEmpty()
+                bu5.isEnabled = canMakeMove && bu5.text.isEmpty()
+                bu6.isEnabled = canMakeMove && bu6.text.isEmpty()
+                bu7.isEnabled = canMakeMove && bu7.text.isEmpty()
+                bu8.isEnabled = canMakeMove && bu8.text.isEmpty()
+                bu9.isEnabled = canMakeMove && bu9.text.isEmpty()
+                
+                // Обновляем аватарки игроков - постоянно обновляем чтобы не пропадали
+                state.playerAvatarUrl?.let { url ->
+                    // player1 avatar можно добавить если есть imageViewUser1
+                }
+                state.opponentAvatarUrl?.let { url ->
+                    if (url.isNotEmpty()) {
+                        imageViewUser2.load(url) {
+                            crossfade(true)
+                            placeholder(R.drawable.ic_fire_emoji)
+                            error(R.drawable.ic_fire_emoji)
+                        }
+                    }
+                }
+                
+                // Показываем аватар и имя противника только когда игра активна
+                val shouldShowOpponentInfo = state.gameStatus == com.example.tictacfirebase.model.GameStatus.Playing || 
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.Won ||
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.Lost ||
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.Draw ||
+                                            state.gameStatus == com.example.tictacfirebase.model.GameStatus.OpponentLeft
+                player2TextView.visibility = if (shouldShowOpponentInfo && state.opponentName.isNotEmpty()) View.VISIBLE else View.GONE
+                imageViewUser2.visibility = if (shouldShowOpponentInfo && state.opponentName.isNotEmpty()) View.VISIBLE else View.GONE
+                
+                // Обновляем индикатор чей ход и статус игры
+                if (state.gameStatus == com.example.tictacfirebase.model.GameStatus.Playing) {
+                    if (state.isMyTurn) {
+                        // Определяем мой символ через isFirstPlayer
+                        val mySymbol = if (state.isFirstPlayer) "X" else "O"
+                        supportActionBar?.subtitle = "Ваш ход ($mySymbol)"
+                    } else {
+                        val opponentSymbol = if (state.isFirstPlayer) "O" else "X"
+                        supportActionBar?.subtitle = "Ход соперника ($opponentSymbol)..."
+                    }
+                } else {
+                    // Показываем результат игры
+                    val resultText = when (state.gameStatus) {
+                        com.example.tictacfirebase.model.GameStatus.Won -> "Вы победили!"
+                        com.example.tictacfirebase.model.GameStatus.Lost -> "Вы проиграли!"
+                        com.example.tictacfirebase.model.GameStatus.Draw -> "Ничья!"
+                        com.example.tictacfirebase.model.GameStatus.OpponentLeft -> "Соперник вышел из игры"
+                        else -> ""
+                    }
+                    supportActionBar?.subtitle = resultText
+                }
+            }
+        }
     }
     
     /**
@@ -201,19 +367,7 @@ open class MainActivity : AppCompatActivity() {
      */
     private fun showNoInternetOverlay(show: Boolean) {
         noInternetOverlay.visibility = if (show) View.VISIBLE else View.GONE
-        // Блокируем все UI элементы когда нет интернета
-        bu1.isEnabled = !show
-        bu2.isEnabled = !show
-        bu3.isEnabled = !show
-        bu4.isEnabled = !show
-        bu5.isEnabled = !show
-        bu6.isEnabled = !show
-        bu7.isEnabled = !show
-        bu8.isEnabled = !show
-        bu9.isEnabled = !show
-        burequest.isEnabled = !show
-        buAcceptEvent.isEnabled = !show && buAcceptEvent.tag == "enabled"
-        etEmail.isEnabled = !show
+        // Блокируем все UI элементы когда нет интернета - остальное управляется через setupGameObserver
     }
     
     /**
@@ -258,6 +412,7 @@ open class MainActivity : AppCompatActivity() {
                         showLoading(true)
                         gameViewModel.updateUserToken(email.splitEmail(), newToken)
                         updateConnectionStatus(getString(R.string.connected))
+                        Log.e(TAG, "Create updating token: ${newToken}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error updating token: ${e.message}")
                         updateConnectionStatus(getString(R.string.error_connection))
@@ -274,36 +429,59 @@ open class MainActivity : AppCompatActivity() {
         val buSelected = view as Button
         var cellID = 0
         when (buSelected.id) {
-            com.example.tictacfirebase.R.id.bu1 -> cellID = AppConstants.CellIds.CELL_1
-            com.example.tictacfirebase.R.id.bu2 -> cellID = AppConstants.CellIds.CELL_2
-            com.example.tictacfirebase.R.id.bu3 -> cellID = AppConstants.CellIds.CELL_3
-            com.example.tictacfirebase.R.id.bu4 -> cellID = AppConstants.CellIds.CELL_4
-            com.example.tictacfirebase.R.id.bu5 -> cellID = AppConstants.CellIds.CELL_5
-            com.example.tictacfirebase.R.id.bu6 -> cellID = AppConstants.CellIds.CELL_6
-            com.example.tictacfirebase.R.id.bu7 -> cellID = AppConstants.CellIds.CELL_7
-            com.example.tictacfirebase.R.id.bu8 -> cellID = AppConstants.CellIds.CELL_8
-            com.example.tictacfirebase.R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
+            R.id.bu1 -> cellID = AppConstants.CellIds.CELL_1
+            R.id.bu2 -> cellID = AppConstants.CellIds.CELL_2
+            R.id.bu3 -> cellID = AppConstants.CellIds.CELL_3
+            R.id.bu4 -> cellID = AppConstants.CellIds.CELL_4
+            R.id.bu5 -> cellID = AppConstants.CellIds.CELL_5
+            R.id.bu6 -> cellID = AppConstants.CellIds.CELL_6
+            R.id.bu7 -> cellID = AppConstants.CellIds.CELL_7
+            R.id.bu8 -> cellID = AppConstants.CellIds.CELL_8
+            R.id.bu9 -> cellID = AppConstants.CellIds.CELL_9
         }
         
         // Отправляем событие в ViewModel для обработки хода
-        gameViewModel.onEvent(com.example.tictacfirebase.model.UiEvent.CellSelected(cellID))
+        gameViewModel.onEvent(UiEvent.CellSelected(cellID))
     }
 
     fun buRequestEvent(view: View) {
         val userDemail = etEmail.text.toString()
         
+        // Проверяем, не пустой ли email
+        if (userDemail.isBlank()) {
+            Toast.makeText(this, "Введите email пользователя", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Проверяем, не тот же ли это самый пользователь
+        if (userDemail.equals(myEmail, ignoreCase = true)) {
+            Toast.makeText(this, "Нельзя отправить запрос самому себе", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        Log.d(TAG, "From: " + userDemail)
+        
+        // Показываем индикатор загрузки во время отправки запроса
+        showLoading(true)
+        
         //unHide player2 icon
-        player2_text_View.visibility = View.VISIBLE
-        image_View_user2.visibility = View.VISIBLE
-        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+        player2TextView.visibility = View.VISIBLE
+        imageViewUser2.visibility = View.VISIBLE
+        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
 
         // Загружаем аватар противника
         lifecycleScope.launch {
-            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-            image_View_user2.load(opponentAvatarUrl)
+            try {
+                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+                imageViewUser2.load(opponentAvatarUrl)
+            } finally {
+                // Скрываем индикатор загрузки после завершения
+                showLoading(false)
+            }
         }
 
         // Отправляем событие в ViewModel
+        Log.d(TAG, "From: onEvent" + myEmail + userDemail)
         gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
     }
 
@@ -311,21 +489,110 @@ open class MainActivity : AppCompatActivity() {
     fun buAcceptEvent(view: View) {
         val userDemail = etEmail.text.toString()
         
+        // Показываем индикатор загрузки во время принятия запроса
+        showLoading(true)
+        
         //unHide player2 icon
-        player2_text_View.visibility = View.VISIBLE
-        image_View_user2.visibility = View.VISIBLE
-        player2_text_View.text = "Player2-" + splitEmailFull(userDemail)
+        player2TextView.visibility = View.VISIBLE
+        imageViewUser2.visibility = View.VISIBLE
+        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
         
         // Загружаем аватар противника
         lifecycleScope.launch {
-            val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-            image_View_user2.load(opponentAvatarUrl)
+            try {
+                val opponentAvatarUrl = loadOpponentAvatar(userDemail)
+                imageViewUser2.load(opponentAvatarUrl)
+            } finally {
+                // Скрываем индикатор загрузки после завершения
+                showLoading(false)
+            }
         }
 
         // Отправляем событие в ViewModel
         gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
     }
+
+    /**
+     * Настройка выпадающего меню с кнопками "Новая игра" и "Выйти"
+     */
+    private fun setupPopupMenu() {
+        btnMenu.setOnClickListener { view ->
+            val popup = PopupMenu(this, view)
+            popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
+            
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    R.id.action_new_game -> {
+                        startNewGame()
+                        true
+                    }
+                    R.id.action_logout -> {
+                        buLogoutEvent(view)
+                        true
+                    }
+                    else -> false
+                }
+            }
+            
+            popup.show()
+        }
+    }
     
+    /**
+     * Обработчик кнопки выхода (logout)
+     * Выходит из аккаунта и перенаправляет на экран регистрации
+     */
+    fun buLogoutEvent(view: View) {
+        Log.d(TAG, "User logged out")
+        
+        // Выход из Firebase Authentication
+        FirebaseAuth.getInstance().signOut()
+        
+        // Переход на экран регистрации
+        val intent = Intent(this, registerActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(intent)
+        finish()
+    }
+    
+    /**
+     * Запуск новой игры - сбрасывает состояние и пересоздает игровое поле
+     */
+    private fun startNewGame() {
+        Log.d(TAG, "Starting new game")
+        
+        // Сбрасываем доску
+        bu1.text = ""
+        bu2.text = ""
+        bu3.text = ""
+        bu4.text = ""
+        bu5.text = ""
+        bu6.text = ""
+        bu7.text = ""
+        bu8.text = ""
+        bu9.text = ""
+        
+        // Сбрасываем статус в заголовке
+        supportActionBar?.subtitle = getString(R.string.waiting_for_opponent)
+        
+        // Скрываем аватар противника
+        player2TextView.visibility = View.GONE
+        imageViewUser2.visibility = View.GONE
+        
+        // Очищаем поле ввода email
+        etEmail.text.clear()
+        
+        // Деактивируем кнопку принятия
+        buAcceptEvent.isEnabled = false
+        
+        // Показываем toast
+        Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_SHORT).show()
+        
+        // Отправляем событие в ViewModel для сброса состояния игры
+        gameViewModel.onEvent(UiEvent.StartNewGame)
+    }
+
     /**
      * Загрузка аватара противника из Firebase
      */
@@ -349,37 +616,30 @@ open class MainActivity : AppCompatActivity() {
         restartGame()
     }
 
-        fun perfotmFCMSendMessages() {
-//        val fromId = FirebaseAuth.getInstance().uid
-//        val user = intent.getParcelableExtra<User>(NewMessageActivity.USER_KEY)
+    private fun performFcmSendMessages() {
         val user = myEmail
         val toId = user
-//        btn_upmessage.setOnClickListener {
         val fm = FirebaseMessaging.getInstance()
-//793202519353@gcm.googleapis.com
-        val message = RemoteMessage.Builder(SENDER_ID + "@fcm.googleapis.com")
-
-                .setMessageId(Integer.toString(random.nextInt(9999)))
+        val message = RemoteMessage.Builder("$SENDER_ID@fcm.googleapis.com")
+                .setMessageId(random.nextInt(9999).toString())
                 .addData("TEST1-- $user", "TEST1--  $toId")
-//                    .addData(edt_key1.text.toString(), edt_value1.text.toString())
-//                    .addData(edt_key2.text.toString(), edt_value2.text.toString())
                 .build()
-        Log.e(TAG, "UpstreamData: " + message)
+        Log.e(TAG, "UpstreamData: $message")
 
-        if (!message.data.isEmpty()) {
-            Log.e(TAG, "UpstreamData: " + message.data)
+        if (message.data.isNotEmpty()) {
+            Log.e(TAG, "UpstreamData: ${message.data}")
         }
 
-        if (!message.messageId!!.isEmpty()) {
-            Log.e(TAG, "UpstreamMessageId: " + message.messageId)
+        if (!message.messageId.isNullOrEmpty()) {
+            Log.e(TAG, "UpstreamMessageId: ${message.messageId}")
         }
 
+        @Suppress("DEPRECATION")
         fm.send(message)
-//        }
     }
 
     fun restartGame() {
-        Toast.makeText(this, " RESTART the game", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_LONG).show()
     }
 
 

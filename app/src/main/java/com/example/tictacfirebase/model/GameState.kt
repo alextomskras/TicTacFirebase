@@ -15,7 +15,8 @@ data class GameState(
     val boardState: List<String> = List(9) { "" }, // "X", "O", ""
     val gameStatus: GameStatus = GameStatus.WaitingForOpponent,
     val errorMessage: String? = null,
-    val sessionId: String? = null
+    val sessionId: String? = null,
+    val isFirstPlayer: Boolean = false // Является ли текущий игрок первым (X)
 )
 
 /**
@@ -40,6 +41,9 @@ sealed class UiEvent {
     object RestartGameClicked : UiEvent()
     data class JoinWithCode(val code: String) : UiEvent()
     data class CellSelected(val cellIndex: Int) : UiEvent()
+    data class SendGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
+    data class AcceptGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
+    object StartNewGame : UiEvent() // Событие для запуска новой игры
 }
 
 /**

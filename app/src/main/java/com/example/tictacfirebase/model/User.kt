@@ -1,7 +1,7 @@
-package com.example.tictacfirebase.models
+package com.example.tictacfirebase.model
 
 import android.os.Parcelable
-import kotlinx.android.parcel.Parcelize
+import kotlinx.parcelize.Parcelize
 
 @Parcelize
 class User(

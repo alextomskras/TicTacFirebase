@@ -1,5 +1,6 @@
 package com.example.tictacfirebase.service
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -10,6 +11,7 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.example.tictacfirebase.LoginActivity
 import com.example.tictacfirebase.R
@@ -20,29 +22,29 @@ import java.util.*
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
-    val TAG = "FCM_Service"
+    private val tag = "FCM_Service"
 
 
-    override fun onMessageReceived(remoteMessage: RemoteMessage?) {
-        Log.d(TAG, "From: " + remoteMessage!!.from)
-        Log.d(TAG, "Notification Message Body: " + remoteMessage.notification!!.body!!)
+    @RequiresApi(Build.VERSION_CODES.O)
+    override fun onMessageReceived(remoteMessage: RemoteMessage) {
+        Log.d(tag, "From: " + remoteMessage.from)
+        Log.d(tag, "Notification Message Body: " + remoteMessage.notification?.body)
         
-        remoteMessage.data?.isNotEmpty()?.let {
-            Log.d(TAG, "Message data payload: " + remoteMessage.data)
+        if (remoteMessage.data.isNotEmpty()) {
+            Log.d(tag, "Message data payload: " + remoteMessage.data)
         }
         sendNotification(remoteMessage)
     }
 
 
-    override fun onNewToken(s: String?) {
-        super.onNewToken(s)
-        val deviceToken = s
-        Log.d("NEW_TOKEN", deviceToken)
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        val deviceToken = token
+        Log.d("FCM_TOKEN", "New token generated")
 
-        if (s != null) {
-            Log.d(TAG, "TOKEN_$s")
-            Toast.makeText(this, "New Token: ${s}", Toast.LENGTH_SHORT).show()
-            saveTokenToFirebaseDatabase(s)
+        if (!token.isNullOrEmpty()) {
+            Log.d(tag, "Token saved to database")
+            saveTokenToFirebaseDatabase(token)
         }
     }
 
@@ -65,22 +67,40 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun sendNotification(remoteMessage: RemoteMessage) {
         val intent = Intent(this, LoginActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+
+        // Добавляем данные из уведомления в интент
+        remoteMessage.notification?.let { notification ->
+            intent.putExtra("title", notification.title)
+            intent.putExtra("body", notification.body)
+        }
+
+        val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        } else {
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        }
+
+
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
-            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            pendingIntentFlags
         )
         val channelId = getString(R.string.default_notification_channel_id)
         val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
-            .setContentText(remoteMessage.notification!!.body)
-            .setContentTitle(getString(R.string.fcm_message))
+            .setContentTitle(remoteMessage.notification?.title ?: getString(R.string.fcm_message))
+            .setContentText(remoteMessage.notification?.body ?: "")
             .setAutoCancel(true)
             .setSmallIcon(R.drawable.ic_fire_emoji)
             .setSound(defaultSoundUri)
             .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         val notificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -90,22 +110,23 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 "Channel human readable title",
                 NotificationManager.IMPORTANCE_HIGH
             )
-            channel.description = "My channel description"
+            channel.description = "Channel for game request notifications"
             channel.enableLights(true)
             channel.lightColor = Color.RED
             channel.enableVibration(true)
+            channel.setShowBadge(true)
+            channel.lockscreenVisibility = NotificationManager.IMPORTANCE_MAX
+            notificationManager.createNotificationChannel(channel)
+        } else {
+            // Для Android 7 и ниже создаем канал с низким приоритетом
+            val channel = NotificationChannel(
+                channelId,
+                "Game Notifications",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            channel.description = "Channel for game request notifications"
             notificationManager.createNotificationChannel(channel)
         }
         notificationManager.notify(0, notificationBuilder.build())
-    }
-
-
-    override fun onMessageSent(msgId: String?) {
-        Log.e(TAG, "onMessageSent: " + msgId!!)
-    }
-
-    override fun onSendError(msgId: String?, e: Exception?) {
-        Log.e(TAG, "onSendError: " + msgId!!)
-        Log.e(TAG, "Exception: " + e!!)
     }
 }

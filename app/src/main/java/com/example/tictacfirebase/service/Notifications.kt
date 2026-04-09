@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.example.tictacfirebase.LoginActivity
@@ -14,9 +15,9 @@ import com.example.tictacfirebase.R
 
 class Notifications {
 
-    val CHANNELSTRING = "TTTTTT"
+    private val CHANNELSTRING = "TTTTTT"
 
-    val NOTIFIYTAG = "new request"
+    private val NOTIFIYTAG = "new request"
     fun Notify(context: Context, message: String, number: Int) {
         val intent = Intent(context, LoginActivity::class.java)
         val channelId = CHANNELSTRING
@@ -36,33 +37,20 @@ class Notifications {
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ECLAIR) {
-            nm.notify(NOTIFIYTAG, 0, builder.build())
-        } else {
-            nm.notify(NOTIFIYTAG.hashCode(), builder.build())
-        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
                 "Channel human readable title",
                 NotificationManager.IMPORTANCE_HIGH
             )
+            channel.description = "My channel description"
+            channel.enableLights(true)
+            channel.lightColor = Color.RED
+            channel.enableVibration(true)
             nm.createNotificationChannel(channel)
         }
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//            // Create the NotificationChannel
-//            val name = R.string.fcm_message.toString()
-//            val descriptionText = R.string.fcm_message.toString()
-//            val importance = NotificationManager.IMPORTANCE_DEFAULT
-//            val mChannel = NotificationChannel(0.toString(), name, importance)
-//            mChannel.description = descriptionText
-//            // Register the channel with the system; you can't change the importance
-//            // or other notification behaviors after this
-//            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-//            notificationManager.createNotificationChannel(mChannel)
-//        }
 
-        nm.notify(NOTIFIYTAG, 0 /* ID of notification */, builder.build())
+        nm.notify(NOTIFIYTAG, 0, builder.build())
 
     }
 

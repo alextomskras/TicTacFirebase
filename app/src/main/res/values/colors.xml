@@ -22,4 +22,8 @@
     <color name="whiteback">#f9f9f9</color>
     <color name="whitebackground">#d4d3d3</color>
     <color name="black">#FF040303</color>
+    
+    <!-- Цвета для крестиков-ноликов: О - синий, Х - красный -->
+    <color name="colorO">#FF0099CC</color>
+    <color name="colorX">#FFFF4444</color>
 </resources>

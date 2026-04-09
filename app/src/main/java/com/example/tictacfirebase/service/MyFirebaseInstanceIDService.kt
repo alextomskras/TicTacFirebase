@@ -9,19 +9,19 @@ import com.google.firebase.messaging.FirebaseMessagingService
 
 
 class MyFirebaseInstanceIDService : FirebaseMessagingService() {
-    val TAG = "NEW_TOKEN"
+    private val tag = "NEW_TOKEN"
 
-    override fun onNewToken(s: String?) {
-        super.onNewToken(s)
-        Log.d("NEW_TOKEN", s)
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        Log.d("NEW_TOKEN", token)
 
-        if (s != null) {
-            Log.d(TAG, "TOKEN_$s")
-            Toast.makeText(this, "New Token: ${s}", Toast.LENGTH_SHORT).show()
+        if (!token.isNullOrEmpty()) {
+            Log.d(tag, "TOKEN_$token")
+            Toast.makeText(this, "New Token: $token", Toast.LENGTH_SHORT).show()
 
             if (FirebaseAuth.getInstance().currentUser != null)
-                addTokenToFirestore(s)
-            saveTokenToFirebaseDatabase(s)
+                addTokenToFirestore(token)
+            saveTokenToFirebaseDatabase(token)
         }
     }
 

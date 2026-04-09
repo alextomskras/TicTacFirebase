@@ -8,6 +8,7 @@
 
               tools:context=".MainActivity">
 
+    <!-- Верхняя панель с кнопками действий -->
     <LinearLayout
             android:layout_margin="10pt"
             android:layout_width="match_parent"
@@ -43,6 +44,16 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:text="@string/accept" />
+
+        <!-- Кнопка меню заменена на выпадающее меню -->
+        <ImageButton
+                android:id="@+id/btnMenu"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="3pt"
+                android:background="@drawable/rounded_button_request"
+                android:contentDescription="Меню"
+                android:src="@android:drawable/ic_menu_more" />
     </LinearLayout>
 
     <!-- Индикатор загрузки -->
@@ -116,13 +127,14 @@
 
     <TableLayout
             android:layout_width="match_parent"
-            android:layout_height="363dp"
+            android:layout_height="wrap_content"
             android:background="@color/whitebackground"
-            android:gravity="center">
+            android:gravity="center"
+            android:layout_gravity="center">
 
         <TableRow
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="3pt"
                 android:gravity="center">
 
@@ -154,8 +166,8 @@
         </TableRow>
 
         <TableRow
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="3pt"
                 android:gravity="center">
 
@@ -187,8 +199,8 @@
         </TableRow>
 
         <TableRow
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:gravity="center">
 
             <Button
@@ -227,10 +239,17 @@
             android:src="@drawable/ic_fire_emoji"
             app:civ_border_width="2dp"
             app:civ_border_overlay="true"
-            app:civ_border_color="#FF000000" android:layout_gravity="center"/>
+            app:civ_border_color="#FF000000" 
+            android:layout_gravity="center"
+            android:visibility="gone"/>
     <TextView
             android:text="@string/player2_enemy_name"
             android:layout_width="80dp"
-            android:layout_height="wrap_content" android:id="@+id/player2_text_View" android:textAlignment="center"
-            android:textStyle="bold" android:textSize="12sp" android:layout_gravity="center"/>
+            android:layout_height="wrap_content" 
+            android:id="@+id/player2_text_View" 
+            android:textAlignment="center"
+            android:textStyle="bold" 
+            android:textSize="12sp" 
+            android:layout_gravity="center"
+            android:visibility="gone"/>
 </LinearLayout>

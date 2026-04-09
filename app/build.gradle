@@ -2,15 +2,20 @@ plugins {
     id 'com.android.application'
     id 'kotlin-android'
     id 'com.google.gms.google-services'
+    id("kotlin-parcelize")
 }
 
 android {
     namespace 'com.example.tictacfirebase'
     compileSdk 34
     
+    buildFeatures {
+        viewBinding true
+    }
+    
     defaultConfig {
         applicationId "com.example.tictacfirebase"
-        minSdk 21
+        minSdk 23
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -54,6 +59,7 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2'
     // LiveData (опционально, если нужно)
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.6.2'
+    implementation 'com.google.android.gms:play-services-measurement-api:21.5.0'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'

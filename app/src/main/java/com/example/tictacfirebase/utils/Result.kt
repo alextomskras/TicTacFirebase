@@ -4,8 +4,8 @@ package com.example.tictacfirebase.utils
  * Универсальный класс для представления результата операции.
  * Позволяет избежать использования исключений для контроля потока выполнения.
  */
-sealed class Result<out T> {
-    data class Success<out T>(val data: T) : Result<T>()
+sealed class Result<T> {
+    data class Success<out T>(val data: T) : Result<@UnsafeVariance T>()
     data class Error(val exception: Throwable, val message: String? = null) : Result<Nothing>()
     object Loading : Result<Nothing>()
 
@@ -18,7 +18,7 @@ sealed class Result<out T> {
         else -> null
     }
 
-    fun getOrDefault(default: T): T = when (this) {
+    fun getOrDefault(default:  T): T = when (this) {
         is Success -> data
         else -> default
     }
@@ -33,13 +33,13 @@ sealed class Result<out T> {
         is Success -> Success(transform(data))
         is Error -> this
         is Loading -> this
-    }
+    } as Result<R>
 
     inline fun <R> flatMap(transform: (T) -> Result<R>): Result<R> = when (this) {
         is Success -> transform(data)
         is Error -> this
         is Loading -> this
-    }
+    } as Result<R>
 
     fun errorOrNull(): Error? = when (this) {
         is Error -> this
@@ -55,5 +55,5 @@ inline fun <T> runCatchingResult(block: () -> T): Result<T> {
         Result.Success(block())
     } catch (e: Exception) {
         Result.Error(e, e.message)
-    }
+    } as Result<T>
 }
