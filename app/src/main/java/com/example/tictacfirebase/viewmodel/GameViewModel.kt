@@ -430,8 +430,11 @@ class GameViewModel(
         }
     }
 
-    fun makeMove(cellIndex: Int) {
+    fun makeMove(cellIndexFromUi: Int) {
         viewModelScope.launch {
+            // Преобразуем индекс из UI (1-9) в индекс массива (0-8)
+            val cellIndex = cellIndexFromUi - 1
+            
             val currentState = _gameState.value
             
             // Блокируем ходы если нет интернета
@@ -468,7 +471,8 @@ class GameViewModel(
             }
 
             // Отправляем ход на сервер (один атомарный вызов)
-            val moveResult = gameRepository.makeMove(gameId, cellIndex, currentState.currentPlayerName, mySymbol)
+            // Передаём cellIndexFromUi для записи в БД (ключи 1-9)
+            val moveResult = gameRepository.makeMove(gameId, cellIndexFromUi, currentState.currentPlayerName, mySymbol)
             
             if (moveResult is com.example.tictacfirebase.utils.Result.Error) {
                 val errorMessage = moveResult.message ?: moveResult.exception.message ?: "Неизвестная ошибка"
