@@ -619,6 +619,9 @@ open class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         
+        // Устанавливаем кастомную иконку overflow (три полосочки вместо трех точек)
+        supportActionBar?.setOverflowIcon(getDrawable(R.drawable.ic_menu_overflow))
+        
         // Скрываем стандартную кнопку "домой" - стандартный overflow (три точки) будет показан автоматически
         supportActionBar?.setDisplayHomeAsUpEnabled(false)
         supportActionBar?.setDisplayShowHomeEnabled(false)
