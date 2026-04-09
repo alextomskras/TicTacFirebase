@@ -270,6 +270,14 @@ open class MainActivity : AppCompatActivity() {
                         else -> null
                     }
                     button?.text = cellValue
+                    // Применяем цвет в зависимости от символа: О - синий, Х - красный
+                    button?.setTextColor(
+                        when (cellValue) {
+                            "O" -> ContextCompat.getColor(this@MainActivity, R.color.colorO)
+                            "X" -> ContextCompat.getColor(this@MainActivity, R.color.colorX)
+                            else -> ContextCompat.getColor(this@MainActivity, R.color.black)
+                        }
+                    )
                 }
                 
                 // Обновляем аватарки игроков - постоянно обновляем чтобы не пропадали
