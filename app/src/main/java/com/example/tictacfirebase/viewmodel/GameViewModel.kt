@@ -317,6 +317,9 @@ class GameViewModel(
             is UiEvent.SendGameRequest -> sendGameRequest(event.fromEmail, event.toEmail)
             is UiEvent.AcceptGameRequest -> acceptGameRequest(event.fromEmail, event.toEmail)
             is UiEvent.StartNewGame -> startNewGame()
+            is UiEvent.CreateGameClicked -> { /* TODO: Implement create game */ }
+            is UiEvent.JoinGameClicked -> { /* TODO: Implement join game */ }
+            is UiEvent.JoinWithCode -> { /* TODO: Implement join with code */ }
         }
     }
 

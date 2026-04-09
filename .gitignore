@@ -1,43 +1,42 @@
-```
-# Build and intermediate files
+```kotlin
+# Kotlin/Android specific
 *.class
-*.dex
-*.oat
-*.odex
-*.so
-*.aar
+*.jar
+*.war
+*.ear
+*.nar
+*.kotlin_metadata
+
+# Android build artifacts
+build/
+.gradle/
+captures/
+
+# Local configuration file (sdk path, etc)
+local.properties
 
 # Gradle
 .gradle/
-build/
-intermediates/
-outputs/
+*/build/
 
 # Android Studio
 .idea/
 *.iml
 *.iws
-*.apk
-*.ap_
-local.properties
-
-# Temporary files
-*.tmp
-*.temp
+*.hprof
+*.pyc
+*.pyo
+*.rbc
+*.yarb
 *~
+.DS_Store
+Thumbs.db
 
-# Logs
-*.log
-
-# Environment
+# Environment variable files
 .env
 .env.local
 *.env.*
 
-# Dependencies
-node_modules/
-venv/
-.venv/
-__pycache__/
-*.egg-info/
+# Logs
+*.log
 ```
