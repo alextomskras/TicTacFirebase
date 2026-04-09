@@ -84,7 +84,7 @@ open class MainActivity : AppCompatActivity() {
         
         // Настройка ActionBar с меню
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setHomeAsUpIndicator(R.drawable.abc_ic_menu_overflow_material)
+        supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_more)
         supportActionBar?.setDisplayShowHomeEnabled(true)
         
         // Инициализация GameRepository для передачи в ViewModel
