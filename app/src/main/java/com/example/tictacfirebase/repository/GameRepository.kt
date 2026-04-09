@@ -384,14 +384,15 @@ class GameRepository {
     /**
      * Совершение хода в игре
      * @param sessionID Уникальный идентификатор сессии
-     * @param cellIndex Индекс клетки (0-8)
+     * @param cellId Индекс клетки (1-9) - как хранится в БД
      * @param playerEmail Email игрока
      * @param symbol Символ игрока (X или O)
      */
-    suspend fun makeMove(sessionID: String, cellIndex: Int, playerEmail: String, symbol: String): Result<Unit> {
+    suspend fun makeMove(sessionID: String, cellId: Int, playerEmail: String, symbol: String): Result<Unit> {
         return runCatchingResult {
             // Сохраняем ход в базу (Firebase использует ключи 1-9)
-            myRef.child("PlayerOnline").child(sessionID).child((cellIndex + 1).toString()).setValue(symbol).await()
+            // cellId уже приходит в формате 1-9 из ViewModel
+            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(symbol).await()
             
             // Переключаем текущий ход на следующего игрока
             val currentTurnSnapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()

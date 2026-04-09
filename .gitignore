@@ -1,3 +1,88 @@
-```
+# Compiled and build artifacts
+*.class
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.jar
+*.war
+*.zip
+*.tar.gz
+*.tar
+*.gz
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+.env
+.env.local
+.env.*
+target/
 .gradle/
-```
+build/
+dist/
+out/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+*.log
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Python specific
+*.pyc
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+
+# Java/Kotlin specific
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+*.iws
+*.ipr
+out/
+
+# Android specific
+*.apk
+*.aab
+local.properties
+captures/
+.externalNativeBuild
+.gradle
+build/
+.app/
+.cache/
+
+# Build outputs
+bin/
+gen/
+intermediates/
+outputs/
+.recommenders
+
+# Configuration
+.gradle/
+.settings/
+.metadata/
