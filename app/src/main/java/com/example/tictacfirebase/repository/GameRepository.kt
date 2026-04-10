@@ -323,7 +323,7 @@ class GameRepository {
                                 // Если клетка пустая - пропускаем
                                 if (value.isBlank()) {
                                     board[index - 1] = ""
-                                    continue
+                                    return@forEach
                                 }
                                 
                                 // Определяем символ на основе email игрока
