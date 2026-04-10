@@ -428,16 +428,23 @@ class GameViewModel(
     /**
      * Принятие запроса на игру
      * СОЗДАЕТ игровую сессию и определяет кто будет X, а кто O
+     * ОТПРАВИТЕЛЬ запроса (fromEmail) получает "X" и ходит первым
+     * ПРИНЯВШИЙ запрос (toEmail) получает "O" и ходит вторым
      */
     private fun acceptGameRequest(fromEmail: String, toEmail: String) {
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
             try {
+                Log.d("GameViewModel", "=== ACCEPTING GAME REQUEST ===")
+                Log.d("GameViewModel", "fromEmail (X, first): $fromEmail")
+                Log.d("GameViewModel", "toEmail (O, second): $toEmail")
+                
                 // Очищаем запрос после принятия
                 gameRepository.clearUserRequests(toEmail)
                 
                 // Создаем сессию игры с СИММЕТРИЧНЫМ именем (сортировка email'ов)
                 val sessionId = generateSessionId(fromEmail, toEmail)
+                Log.d("GameViewModel", "Generated SessionID: $sessionId")
                 
                 // Сначала создаем сессию (очищаем старую)
                 val createResult = gameRepository.createGameSession(sessionId)
@@ -471,14 +478,20 @@ class GameViewModel(
                             ) 
                         }
                         
+                        Log.d("GameViewModel", "Game session successfully created and setup!")
+                        Log.d("GameViewModel", "Current user ($toEmail) is player2 (O)")
+                        Log.d("GameViewModel", "Opponent ($fromEmail) is player1 (X) and goes first")
+                        
                         sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите вторым (O). $fromEmail ходит первым (X)"))
                         // НЕ вызываем loadInitialData() - observeGameChanges уже наблюдает за изменениями через Flow
                     } else if (setupResult is com.example.tictacfirebase.utils.Result.Error) {
                         val errorMessage = setupResult.message ?: setupResult.exception.message ?: "Неизвестная ошибка"
+                        Log.e("GameViewModel", "Setup failed: $errorMessage")
                         sendEffect(UiEffect.ShowToast("Ошибка настройки игры: $errorMessage"))
                     }
                 } else if (createResult is com.example.tictacfirebase.utils.Result.Error) {
                     val errorMessage = createResult.message ?: createResult.exception.message ?: "Неизвестная ошибка"
+                    Log.e("GameViewModel", "Create failed: $errorMessage")
                     sendEffect(UiEffect.ShowToast("Ошибка создания игры: $errorMessage"))
                 }
             } finally {
