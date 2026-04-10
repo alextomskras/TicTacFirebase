@@ -94,7 +94,10 @@ class GameViewModel(
      * Обновление токена пользователя
      */
     suspend fun updateUserToken(userEmail: String, token: String) {
-        gameRepository.updateUserToken(userEmail, token)
+        val result = gameRepository.updateUserToken(userEmail, token)
+        if (result is com.example.tictacfirebase.utils.Result.Error) {
+            throw result.exception
+        }
     }
 
     /**
