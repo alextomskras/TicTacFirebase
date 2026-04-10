@@ -4,8 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -14,9 +12,12 @@ import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.ActionBar
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import coil.load
+import com.example.tictacfirebase.model.UiEffect
 import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.utils.AppConstants
@@ -29,10 +30,8 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
-import coil.load
-import com.example.tictacfirebase.model.UiEffect
 import kotlinx.coroutines.launch
-import java.util.Random
+import java.util.*
 
 open class MainActivity : AppCompatActivity() {
 
@@ -351,6 +350,8 @@ open class MainActivity : AppCompatActivity() {
      */
     private fun updateConnectionStatus(status: String) {
         tvConnectionStatus.text = status
+        // Не показываем progressBar, если loading уже false
+        progressBar.visibility = if () View.VISIBLE else View.GONE
     }
     
     /**
@@ -618,7 +619,7 @@ open class MainActivity : AppCompatActivity() {
         menuInflater.inflate(R.menu.menu_main, menu)
         
         // Устанавливаем кастомную иконку overflow (три полосочки вместо трех точек)
-        supportActionBar?.setOverflowIcon(getDrawable(R.drawable.ic_menu_overflow))
+//        supportActionBar?.setOverflowIcon(getDrawable(R.drawable.ic_menu_overflow))
         
         // Скрываем стандартную кнопку "домой" - стандартный overflow (три точки) будет показан автоматически
         supportActionBar?.setDisplayHomeAsUpEnabled(false)
