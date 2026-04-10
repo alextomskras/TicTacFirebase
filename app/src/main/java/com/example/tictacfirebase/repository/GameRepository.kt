@@ -90,11 +90,13 @@ class GameRepository {
             // ВАЖНО: Создаем и настраиваем игровую сессию сразу при отправке запроса
             // Это позволяет обоим игрокам видеть сессию в БД до принятия запроса
             // Также создаем начальную структуру для ходов (очищаем старые ходы если были)
+            // firstPlayer = fromUser (отправитель запроса), он будет ходить первым и играть за X
+            // player1 = fromUser (X), player2 = toUser (O)
             val sessionUpdates = mapOf(
-                "firstPlayer" to fromUser,
-                "currentTurn" to fromUser,
-                "player1" to fromUser,
-                "player2" to toUser,
+                "firstPlayer" to fromUser,      // Отправитель запроса всегда первый (X)
+                "currentTurn" to fromUser,     // Первый ход у отправителя запроса
+                "player1" to fromUser,         // player1 = X
+                "player2" to toUser,           // player2 = O
                 "initialized" to true,
                 "sessionCreated" to System.currentTimeMillis(),
                 // Явно создаем пустые клетки 1-9 для игрового поля
@@ -113,7 +115,14 @@ class GameRepository {
             // Принудительно читаем только что записанные данные для подтверждения
             val verificationSnapshot = myRef.child("PlayerOnline").child(sessionId).get().await()
             val verifiedCurrentTurn = verificationSnapshot.child("currentTurn").value as? String ?: ""
-            Log.d("GameRepository", "Verified currentTurn after sendGameRequest setup: $verifiedCurrentTurn")
+            val verifiedFirstPlayer = verificationSnapshot.child("firstPlayer").value as? String ?: ""
+            val verifiedPlayer1 = verificationSnapshot.child("player1").value as? String ?: ""
+            val verifiedPlayer2 = verificationSnapshot.child("player2").value as? String ?: ""
+            Log.d("GameRepository", "Verified after sendGameRequest setup:")
+            Log.d("GameRepository", "  currentTurn=$verifiedCurrentTurn")
+            Log.d("GameRepository", "  firstPlayer=$verifiedFirstPlayer")
+            Log.d("GameRepository", "  player1=$verifiedPlayer1")
+            Log.d("GameRepository", "  player2=$verifiedPlayer2")
             
             Log.d("GameRepository", "Game session created and setup in PlayerOnline/$sessionId")
             Log.d("GameRepository", "Initial game board with cells 1-9 created in database")
@@ -300,6 +309,9 @@ class GameRepository {
                     
                     Log.d("GameRepository", "observeBoardState: player1=$player1Snapshot, player2=$player2Snapshot")
                     
+                    // Определяем первого игрока (кто ходит первым) - он всегда X
+                    val firstPlayer = snapshot.child("firstPlayer").value as? String ?: player1Snapshot
+                    
                     snapshot.children.forEach { child ->
                         val key = child.key
                         // Пропускаем служебные ключи (firstPlayer, currentTurn, player1, player2 и т.д.)
@@ -307,18 +319,37 @@ class GameRepository {
                             val index = key.toInt()
                             if (index in 1..9) {
                                 val value = child.value.toString()
+                                
+                                // Если клетка пустая - пропускаем
+                                if (value.isBlank()) {
+                                    board[index - 1] = ""
+                                    continue
+                                }
+                                
                                 // Определяем символ на основе email игрока
+                                // ВАЖНО: firstPlayer всегда получает X, второй игрок получает O
                                 val symbol = when {
-                                    value == player1Snapshot -> "X"
-                                    value == player2Snapshot -> "O"
-                                    value == "X" || value == "O" -> value // Уже сохранен как символ
+                                    value == firstPlayer -> "X"
+                                    value == player1Snapshot && player1Snapshot != firstPlayer -> "O"
+                                    value == player2Snapshot -> {
+                                        if (player2Snapshot == firstPlayer) "X" else "O"
+                                    }
+                                    value == "X" -> "X"
+                                    value == "O" -> "O"
                                     else -> {
+                                        // Fallback: если не можем определить, оставляем как есть
                                         Log.w(
                                             "GameRepository",
-                                            "Unknown value in cell $index: $value (player1=$player1Snapshot, player2=$player2Snapshot)"
+                                            "Unknown value in cell $index: '$value' (firstPlayer=$firstPlayer, player1=$player1Snapshot, player2=$player2Snapshot)"
                                         )
-
-                                        value
+                                        // Пытаемся определить по текущему ходу
+                                        val currentTurn = snapshot.child("currentTurn").value as? String ?: ""
+                                        if (value == currentTurn) {
+                                            // Это только что сделанный ход - определяем по firstPlayer
+                                            if (firstPlayer == value) "X" else "O"
+                                        } else {
+                                            value
+                                        }
                                     }
                                 }
                                 board[index - 1] = symbol
@@ -433,16 +464,20 @@ class GameRepository {
      * Настройка игровой сессии после создания
      * Устанавливает первого игрока, текущий ход и имена игроков
      * Также гарантирует наличие пустого игрового поля (клетки 1-9)
+     * @param player1 Email первого игрока (отправитель запроса, всегда X)
+     * @param player2 Email второго игрока (принявший запрос, всегда O)
      */
     suspend fun setupGameSession(sessionID: String, player1: String, player2: String): Result<Unit> {
         return runCatchingResult {
             // Используем updateChildren для атомарной установки всех полей
             // Это гарантирует что все данные будут записаны одновременно
+            // ВАЖНО: player1 = отправитель запроса = firstPlayer = X
+            //        player2 = принявший запрос = второй игрок = O
             val updates = mapOf(
-                "firstPlayer" to player1,
-                "currentTurn" to player1,
-                "player1" to player1,
-                "player2" to player2,
+                "firstPlayer" to player1,      // Отправитель запроса всегда первый (X)
+                "currentTurn" to player1,     // Первый ход у отправителя запроса
+                "player1" to player1,         // player1 = X
+                "player2" to player2,         // player2 = O
                 "initialized" to true,
                 // Явно создаем пустые клетки 1-9 для игрового поля
                 // Это гарантирует что поле существует даже если было удалено
@@ -462,8 +497,8 @@ class GameRepository {
             // Добавляем логирование для отладки
             Log.d("GameRepository", "=== GAME SESSION SETUP ===")
             Log.d("GameRepository", "SessionID: $sessionID")
-            Log.d("GameRepository", "player1 (X): $player1")
-            Log.d("GameRepository", "player2 (O): $player2")
+            Log.d("GameRepository", "player1 (X, first): $player1")
+            Log.d("GameRepository", "player2 (O, second): $player2")
             Log.d("GameRepository", "firstPlayer/currentTurn: $player1")
             Log.d("GameRepository", "Game board cells 1-9 initialized")
             Log.d("GameRepository", "=========================")
@@ -471,7 +506,14 @@ class GameRepository {
             // Принудительно читаем только что записанные данные для подтверждения
             val verificationSnapshot = myRef.child("PlayerOnline").child(sessionID).get().await()
             val verifiedCurrentTurn = verificationSnapshot.child("currentTurn").value as? String ?: ""
-            Log.d("GameRepository", "Verified currentTurn after setup: $verifiedCurrentTurn")
+            val verifiedFirstPlayer = verificationSnapshot.child("firstPlayer").value as? String ?: ""
+            val verifiedPlayer1 = verificationSnapshot.child("player1").value as? String ?: ""
+            val verifiedPlayer2 = verificationSnapshot.child("player2").value as? String ?: ""
+            Log.d("GameRepository", "Verified after setupGameSession:")
+            Log.d("GameRepository", "  currentTurn=$verifiedCurrentTurn")
+            Log.d("GameRepository", "  firstPlayer=$verifiedFirstPlayer")
+            Log.d("GameRepository", "  player1=$verifiedPlayer1")
+            Log.d("GameRepository", "  player2=$verifiedPlayer2")
         }
     }
     
