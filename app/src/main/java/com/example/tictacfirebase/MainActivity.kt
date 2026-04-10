@@ -23,9 +23,9 @@ import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.utils.AppConstants
 import com.example.tictacfirebase.utils.NetworkMonitor
+import com.example.tictacfirebase.utils.isValidEmail
 import com.example.tictacfirebase.utils.splitEmail
 import com.example.tictacfirebase.utils.splitEmailFull
-import com.example.tictacfirebase.utils.isValidEmail
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
@@ -533,6 +533,10 @@ open class MainActivity : AppCompatActivity() {
                 
                 // Отправляем событие в ViewModel после загрузки аватара
                 gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
+
+                // Деактивируем кнопку принятия после успешного принятия запроса
+                buAcceptEvent.isEnabled = false
+                buAcceptEvent.tag = "disabled"
             } catch (e: Exception) {
                 Log.e(TAG, "Error accepting request: ${e.message}")
                 Toast.makeText(this@MainActivity, "Ошибка принятия запроса: ${e.message}", Toast.LENGTH_LONG).show()

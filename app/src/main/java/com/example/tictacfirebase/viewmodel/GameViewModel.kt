@@ -1,5 +1,6 @@
 package com.example.tictacfirebase.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.tictacfirebase.game.GameManager
@@ -8,13 +9,13 @@ import com.example.tictacfirebase.model.GameStatus
 import com.example.tictacfirebase.model.UiEffect
 import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 /**
@@ -130,7 +131,7 @@ class GameViewModel(
                     sessionInfo.player1 
                 }
                 val opponentName = if (myName == sessionInfo.player1) sessionInfo.player2 else sessionInfo.player1
-                val firstPlayer = sessionInfo.firstPlayer
+                sessionInfo.firstPlayer
                 val currentTurn = sessionInfo.currentTurn
                 
                 // Определяем кто есть кто относительно текущего пользователя
@@ -168,7 +169,7 @@ class GameViewModel(
                         errorMessage = "Ошибка загрузки данных: $errorMessage"
                     )
                 }
-                sendEffect(com.example.tictacfirebase.model.UiEffect.ShowToast("Ошибка: $errorMessage"))
+                sendEffect(UiEffect.ShowToast("Ошибка: $errorMessage"))
             }
         }
     }
@@ -176,7 +177,7 @@ class GameViewModel(
     private fun observeGameChanges() {
         viewModelScope.launch {
             gameRepository.observeBoardState(gameId).collect { board ->
-                val myName = _gameState.value.currentPlayerName
+                _gameState.value.currentPlayerName
                 
                 // Обновляем состояние доски
                 val newBoardState = board.map { it ?: "" }
