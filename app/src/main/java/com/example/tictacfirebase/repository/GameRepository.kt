@@ -110,6 +110,11 @@ class GameRepository {
             )
             myRef.child("PlayerOnline").child(sessionId).updateChildren(sessionUpdates).await()
             
+            // Принудительно читаем только что записанные данные для подтверждения
+            val verificationSnapshot = myRef.child("PlayerOnline").child(sessionId).get().await()
+            val verifiedCurrentTurn = verificationSnapshot.child("currentTurn").value as? String ?: ""
+            Log.d("GameRepository", "Verified currentTurn after sendGameRequest setup: $verifiedCurrentTurn")
+            
             Log.d("GameRepository", "Game session created and setup in PlayerOnline/$sessionId")
             Log.d("GameRepository", "Initial game board with cells 1-9 created in database")
             
@@ -293,6 +298,8 @@ class GameRepository {
                     val player1Snapshot = snapshot.child("player1").value as? String ?: ""
                     val player2Snapshot = snapshot.child("player2").value as? String ?: ""
                     
+                    Log.d("GameRepository", "observeBoardState: player1=$player1Snapshot, player2=$player2Snapshot")
+                    
                     snapshot.children.forEach { child ->
                         val key = child.key
                         // Пропускаем служебные ключи (firstPlayer, currentTurn, player1, player2 и т.д.)
@@ -302,7 +309,6 @@ class GameRepository {
                                 val value = child.value.toString()
                                 // Определяем символ на основе email игрока
                                 val symbol = when {
-
                                     value == player1Snapshot -> "X"
                                     value == player2Snapshot -> "O"
                                     value == "X" || value == "O" -> value // Уже сохранен как символ
@@ -318,12 +324,13 @@ class GameRepository {
                                 board[index - 1] = symbol
                                 Log.d(
                                     "GameRepository",
-                                    "observeBoardState: cell $index mapped to symbol '$symbol'"
+                                    "observeBoardState: cell $index = '$value' -> symbol '$symbol'"
                                 )
                             }
                         }
                     }
                     
+                    Log.d("GameRepository", "observeBoardState: sending board state: ${board.toList()}")
                     trySend(board.toList())
                 } catch (e: Exception) {
                     println("observeBoardState error: $e")
@@ -460,6 +467,11 @@ class GameRepository {
             Log.d("GameRepository", "firstPlayer/currentTurn: $player1")
             Log.d("GameRepository", "Game board cells 1-9 initialized")
             Log.d("GameRepository", "=========================")
+            
+            // Принудительно читаем только что записанные данные для подтверждения
+            val verificationSnapshot = myRef.child("PlayerOnline").child(sessionID).get().await()
+            val verifiedCurrentTurn = verificationSnapshot.child("currentTurn").value as? String ?: ""
+            Log.d("GameRepository", "Verified currentTurn after setup: $verifiedCurrentTurn")
         }
     }
     
@@ -478,22 +490,10 @@ class GameRepository {
                 "SessionID: $sessionID, CellId: $cellId, Player: $playerEmail, Symbol: $symbol"
             )
 
-            // Проверяем текущий ход перед записью
-//            val currentTurnSnapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()
-//            val currentPlayer = currentTurnSnapshot.value as? String ?: ""
-
-
-
-            // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
-            // observeBoardState затем преобразует email в символ (X/O) на основе player1/player2
-            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(playerEmail).await()
-            
-            // Переключаем текущий ход на следующего игрока
+            // Проверяем текущий ход ПЕРЕД записью
             val currentTurnSnapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()
             val currentPlayer = currentTurnSnapshot.value as? String ?: ""
             Log.d("GameRepository", "Current turn before move: $currentPlayer")
-
-            Log.d("GameRepository", "Current turn before move1: $currentPlayer")
 
             if (currentPlayer != playerEmail) {
                 Log.w(
@@ -503,6 +503,19 @@ class GameRepository {
                 throw Exception("Сейчас не ваш ход! Ожидается ход от $currentPlayer")
             }
             
+            // Проверяем, не занята ли клетка
+            val cellSnapshot = myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).get().await()
+            val cellValue = cellSnapshot.value as? String
+            if (!cellValue.isNullOrBlank()) {
+                Log.w("GameRepository", "Cell $cellId is already occupied by $cellValue")
+                throw Exception("Клетка уже занята!")
+            }
+
+            // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
+            // observeBoardState затем преобразует email в символ (X/O) на основе player1/player2
+            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(playerEmail).await()
+            
+            // Переключаем текущий ход на следующего игрока
             val player1Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
             val player1 = player1Snapshot.value as? String ?: ""
             
@@ -567,8 +580,11 @@ class GameRepository {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
+                    // Наблюдаем за всем узлом сессии, а не только за currentTurn
+                    // Это гарантирует что мы получим обновление когда currentTurn изменится
                     val currentTurnSnapshot = snapshot.child("currentTurn")
                     val currentTurn = currentTurnSnapshot.value as? String ?: ""
+                    Log.d("GameRepository", "observeCurrentTurn: currentTurn=$currentTurn for session=$sessionID")
                     trySend(currentTurn)
                 } catch (e: Exception) {
                     println("observeCurrentTurn error: $e")
@@ -582,10 +598,11 @@ class GameRepository {
             }
         }
         
-        myRef.child("PlayerOnline").child(sessionID).addValueEventListener(listener)
+        // Слушаем конкретный child "currentTurn" для более эффективного обновления
+        myRef.child("PlayerOnline").child(sessionID).child("currentTurn").addValueEventListener(listener)
         
         awaitClose {
-            myRef.child("PlayerOnline").child(sessionID).removeEventListener(listener)
+            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").removeEventListener(listener)
         }
     }
     

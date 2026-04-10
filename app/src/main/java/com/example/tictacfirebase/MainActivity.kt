@@ -484,16 +484,23 @@ open class MainActivity : AppCompatActivity() {
         // Показываем индикатор загрузки во время отправки запроса
         showLoading(true)
         
-        //unHide player2 icon
-        player2TextView.visibility = View.VISIBLE
-        imageViewUser2.visibility = View.VISIBLE
-        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
-
-        // Загружаем аватар противника и отправляем запрос
+        // Загружаем аватар противника и показываем UI
         lifecycleScope.launch {
             try {
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                imageViewUser2.load(opponentAvatarUrl)
+                
+                // Показываем аватар и имя противника ТОЛЬКО после успешной загрузки аватара
+                player2TextView.visibility = View.VISIBLE
+                imageViewUser2.visibility = View.VISIBLE
+                player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
+                
+                if (opponentAvatarUrl != null) {
+                    imageViewUser2.load(opponentAvatarUrl) {
+                        crossfade(true)
+                        placeholder(R.drawable.ic_fire_emoji)
+                        error(R.drawable.ic_fire_emoji)
+                    }
+                }
                 
                 // Отправляем событие в ViewModel после загрузки аватара
                 gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
@@ -520,16 +527,23 @@ open class MainActivity : AppCompatActivity() {
         // Показываем индикатор загрузки во время принятия запроса
         showLoading(true)
         
-        //unHide player2 icon
-        player2TextView.visibility = View.VISIBLE
-        imageViewUser2.visibility = View.VISIBLE
-        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
-        
-        // Загружаем аватар противника и принимаем запрос
+        // Загружаем аватар противника и показываем UI
         lifecycleScope.launch {
             try {
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                imageViewUser2.load(opponentAvatarUrl)
+                
+                // Показываем аватар и имя противника ТОЛЬКО после успешной загрузки аватара
+                player2TextView.visibility = View.VISIBLE
+                imageViewUser2.visibility = View.VISIBLE
+                player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
+                
+                if (opponentAvatarUrl != null) {
+                    imageViewUser2.load(opponentAvatarUrl) {
+                        crossfade(true)
+                        placeholder(R.drawable.ic_fire_emoji)
+                        error(R.drawable.ic_fire_emoji)
+                    }
+                }
                 
                 // Отправляем событие в ViewModel после загрузки аватара
                 gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
