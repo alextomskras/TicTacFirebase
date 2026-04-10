@@ -84,6 +84,22 @@ class GameRepository {
             // Сохраняем запрос в БД
             myRef.child("users").child(splitToUser).child("request").push().setValue(fromUser).await()
             
+            // Создаем sessionId заранее для создания сессии
+            val sessionId = if (splitFromUser < splitToUser) "${splitFromUser}_${splitToUser}" else "${splitToUser}_${splitFromUser}"
+            
+            // ВАЖНО: Создаем и настраиваем игровую сессию сразу при отправке запроса
+            // Это позволяет обоим игрокам видеть сессию в БД до принятия запроса
+            val sessionUpdates = mapOf(
+                "firstPlayer" to fromUser,
+                "currentTurn" to fromUser,
+                "player1" to fromUser,
+                "player2" to toUser,
+                "initialized" to true,
+                "sessionCreated" to System.currentTimeMillis()
+            )
+            myRef.child("PlayerOnline").child(sessionId).updateChildren(sessionUpdates).await()
+            Log.d("GameRepository", "Game session created and setup in PlayerOnline/$sessionId")
+            
             // Сохраняем данные для FCM в отдельном узле для Cloud Function
             val fcmData = mapOf(
                 "fromUser" to fromUser,
@@ -104,19 +120,21 @@ class GameRepository {
      */
     suspend fun createGameSession(sessionID: String): Result<Unit> {
         return runCatchingResult {
-            // Очищаем только нашу сессию, а не все PlayerOnline
-            // Это удаляет старые ходы, но setupGameSession установит player1, player2, firstPlayer, currentTurn заново
-            myRef.child("PlayerOnline").child(sessionID).removeValue().await()
-            
             // Добавляем логирование для отладки
-            Log.d("GameRepository", "=== GAME SESSION CREATED/CLEARED ===")
+            Log.d("GameRepository", "=== GAME SESSION CREATED ===")
             Log.d("GameRepository", "SessionID: $sessionID")
             Log.d("GameRepository", "=====================================")
             
-            // ВАЖНО: Создаем минимальную структуру сессии чтобы она существовала в БД
-            // Это позволяет observeBoardState и observeCurrentTurn подписаться на изменения
-            // даже до вызова setupGameSession
-            myRef.child("PlayerOnline").child(sessionID).child("initialized").setValue(true).await()
+            // ВАЖНО: Не удаляем сессию полностью, чтобы setupGameSession мог корректно установить данные
+            // Просто убеждаемся что сессия существует в БД
+            // setupGameSession установит player1, player2, firstPlayer, currentTurn заново
+            val updates = mapOf(
+                "initialized" to true,
+                "sessionCreated" to System.currentTimeMillis()
+            )
+            myRef.child("PlayerOnline").child(sessionID).updateChildren(updates).await()
+            
+            Log.d("GameRepository", "Session initialized in database")
         }
     }
     
@@ -385,11 +403,17 @@ class GameRepository {
      */
     suspend fun setupGameSession(sessionID: String, player1: String, player2: String): Result<Unit> {
         return runCatchingResult {
-            // Первый игрок (player1) получает "X" и ходит первым
-            myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").setValue(player1).await()
-            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(player1).await()
-            myRef.child("PlayerOnline").child(sessionID).child("player1").setValue(player1).await()
-            myRef.child("PlayerOnline").child(sessionID).child("player2").setValue(player2).await()
+            // Используем updateChildren для атомарной установки всех полей
+            // Это гарантирует что все данные будут записаны одновременно
+            val updates = mapOf(
+                "firstPlayer" to player1,
+                "currentTurn" to player1,
+                "player1" to player1,
+                "player2" to player2,
+                "initialized" to true
+            )
+            
+            myRef.child("PlayerOnline").child(sessionID).updateChildren(updates).await()
             
             // Добавляем логирование для отладки
             Log.d("GameRepository", "=== GAME SESSION SETUP ===")
