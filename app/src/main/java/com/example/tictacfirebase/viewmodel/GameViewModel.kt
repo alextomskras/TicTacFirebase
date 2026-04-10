@@ -444,18 +444,22 @@ class GameViewModel(
                 Log.d("GameViewModel", "fromEmail (X, first): $fromEmail")
                 Log.d("GameViewModel", "toEmail (O, second): $toEmail")
                 
-                // Очищаем запрос после принятия
-                gameRepository.clearUserRequests(toEmail)
-                
-                // Создаем сессию игры с СИММЕТРИЧНЫМ именем (сортировка email'ов)
+                // Создаем sessionId заранее
                 val sessionId = generateSessionId(fromEmail, toEmail)
                 Log.d("GameViewModel", "Generated SessionID: $sessionId")
                 
-                // Сессия уже должна быть создана в sendGameRequest(), но на всякий случай убеждаемся что она существует
-                // setupGameSession обновит все поля если сессия уже есть
+                // ВАЖНО: Сначала настраиваем сессию (создаем поле с клетками 1-9), ТОЛЬКО ПОТОМ очищаем запрос
+                // Если очистить запрос раньше, могут возникнуть проблемы с синхронизацией
+                Log.d("GameViewModel", "Calling setupGameSession...")
                 val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
+                Log.d("GameViewModel", "setupGameSession completed with result: $setupResult")
                 
                 if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
+                    // Очищаем запрос ПОСЛЕ успешной настройки сессии
+                    Log.d("GameViewModel", "Clearing user requests...")
+                    gameRepository.clearUserRequests(toEmail)
+                    Log.d("GameViewModel", "User requests cleared")
+                    
                     // Загружаем аватарки ПЕРЕД обновлением состояния
                     val myAvatarResult = gameRepository.getUserProfileImage(toEmail)
                     val opponentAvatarResult = gameRepository.getUserProfileImage(fromEmail)
