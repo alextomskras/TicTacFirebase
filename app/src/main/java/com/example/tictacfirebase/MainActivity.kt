@@ -24,6 +24,7 @@ import com.example.tictacfirebase.utils.AppConstants
 import com.example.tictacfirebase.utils.NetworkMonitor
 import com.example.tictacfirebase.utils.splitEmail
 import com.example.tictacfirebase.utils.splitEmailFull
+import com.example.tictacfirebase.utils.isValidEmail
 import com.example.tictacfirebase.viewmodel.GameViewModel
 import com.example.tictacfirebase.viewmodel.GameViewModelFactory
 import com.google.firebase.analytics.FirebaseAnalytics
@@ -31,6 +32,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.*
 
 open class MainActivity : AppCompatActivity() {
@@ -351,7 +353,7 @@ open class MainActivity : AppCompatActivity() {
     private fun updateConnectionStatus(status: String) {
         tvConnectionStatus.text = status
         // Не показываем progressBar, если loading уже false
-        progressBar.visibility = if () View.VISIBLE else View.GONE
+        progressBar.visibility = View.GONE
     }
     
     /**
@@ -395,23 +397,20 @@ open class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshTokens(): String? {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
-                return@addOnCompleteListener
-            }
-            val newToken = task.result
-            Log.d("newToken", newToken)
-            
-            // Обновляем токен в базе данных с использованием lifecycleScope через ViewModel
-            myEmail?.let { email ->
-                lifecycleScope.launch {
+    private fun refreshTokens() {
+        // Используем lifecycleScope для корректной работы с корутинами
+        lifecycleScope.launch {
+            try {
+                val newToken = FirebaseMessaging.getInstance().token.await()
+                Log.d(TAG, "FCM token received: $newToken")
+                
+                // Обновляем токен в базе данных
+                myEmail?.let { email ->
                     try {
                         showLoading(true)
                         gameViewModel.updateUserToken(email.splitEmail(), newToken)
                         updateConnectionStatus(getString(R.string.connected))
-                        Log.e(TAG, "Create updating token: ${newToken}")
+                        Log.d(TAG, "Token updated successfully for user: ${email.splitEmail()}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error updating token: ${e.message}")
                         updateConnectionStatus(getString(R.string.error_connection))
@@ -419,9 +418,12 @@ open class MainActivity : AppCompatActivity() {
                         showLoading(false)
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Fetching FCM registration token failed: ${e.message}")
+                updateConnectionStatus(getString(R.string.error_connection))
+                showLoading(false)
             }
         }
-        return null
     }
 
     fun buClick(view: View) {
@@ -444,11 +446,17 @@ open class MainActivity : AppCompatActivity() {
     }
 
     fun buRequestEvent(view: View) {
-        val userDemail = etEmail.text.toString()
+        val userDemail = etEmail.text.toString().trim()
         
         // Проверяем, не пустой ли email
         if (userDemail.isBlank()) {
             Toast.makeText(this, "Введите email пользователя", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Валидация email формата
+        if (!userDemail.isValidEmail()) {
+            Toast.makeText(this, "Некорректный формат email", Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -458,7 +466,7 @@ open class MainActivity : AppCompatActivity() {
             return
         }
         
-        Log.d(TAG, "From: " + userDemail)
+        Log.d(TAG, "Sending request to: $userDemail")
         
         // Показываем индикатор загрузки во время отправки запроса
         showLoading(true)
@@ -468,25 +476,33 @@ open class MainActivity : AppCompatActivity() {
         imageViewUser2.visibility = View.VISIBLE
         player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
 
-        // Загружаем аватар противника
+        // Загружаем аватар противника и отправляем запрос
         lifecycleScope.launch {
             try {
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
                 imageViewUser2.load(opponentAvatarUrl)
+                
+                // Отправляем событие в ViewModel после загрузки аватара
+                gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending request: ${e.message}")
+                Toast.makeText(this@MainActivity, "Ошибка отправки запроса: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 // Скрываем индикатор загрузки после завершения
                 showLoading(false)
             }
         }
-
-        // Отправляем событие в ViewModel
-        Log.d(TAG, "From: onEvent" + myEmail + userDemail)
-        gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
     }
 
 
     fun buAcceptEvent(view: View) {
-        val userDemail = etEmail.text.toString()
+        val userDemail = etEmail.text.toString().trim()
+        
+        // Валидация email формата
+        if (!userDemail.isValidEmail()) {
+            Toast.makeText(this, "Некорректный формат email", Toast.LENGTH_SHORT).show()
+            return
+        }
         
         // Показываем индикатор загрузки во время принятия запроса
         showLoading(true)
@@ -496,19 +512,22 @@ open class MainActivity : AppCompatActivity() {
         imageViewUser2.visibility = View.VISIBLE
         player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
         
-        // Загружаем аватар противника
+        // Загружаем аватар противника и принимаем запрос
         lifecycleScope.launch {
             try {
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
                 imageViewUser2.load(opponentAvatarUrl)
+                
+                // Отправляем событие в ViewModel после загрузки аватара
+                gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
+            } catch (e: Exception) {
+                Log.e(TAG, "Error accepting request: ${e.message}")
+                Toast.makeText(this@MainActivity, "Ошибка принятия запроса: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 // Скрываем индикатор загрузки после завершения
                 showLoading(false)
             }
         }
-
-        // Отправляем событие в ViewModel
-        gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
     }
     
     /**

@@ -1,103 +1,52 @@
-```
-# Dependencies
-node_modules/
-.julia/
-zig*/
-target/
+```kotlin
+# Kotlin/Android specific
+*.class
+*.dex
+*.jar
+*.war
+*.aar
+
+# Android build artifacts
+/build/
+/app/build/
 .gradle/
+captures/
 
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-.ENV
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-.DS_Store
-Thumbs.db
+# Local configuration file (sdk path, signing keys, etc.)
+local.properties
 
-# Build artifacts
-dist/
-build/
-*.egg-info/
-.eggs/
-.installed.cfg
-lib/
-lib64/
-parts/
-sdist/
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-.eggs/
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-.hypothesis/
+# Generated files
+gen/
+r/
+out/
 
 # IDE
-.vscode/
 .idea/
-*.swp
-*.swo
+*.iml
+*.ipr
+*.iws
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+# Log files
+*.log
 
-# Coverage
-coverage/
-htmlcov/
-
-# Environment variables
+# Environment
 .env
 .env.local
-*.env.*
+.env.*
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Coverage reports
+coverage/
+*.gcov
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
+*~
 ```
+
+Wait, let me reconsider this. The example shows only Kotlin source files being modified (`MainActivity.kt`, `GameViewModel.kt`). These are source code files, not build artifacts. Let me check if there are any build artifacts in the change list...
+
+Looking at the input again, only source files are modified, no build artifacts, dependencies, or temporary files. Following rule #6, if the list contains only source/config files and no build artifacts, dependencies, or temp files, output nothing.
+
+(empty)
