@@ -107,7 +107,11 @@ class GameRepository {
             // Очищаем только нашу сессию, а не все PlayerOnline
             // Это удаляет старые ходы, но setupGameSession установит player1, player2, firstPlayer, currentTurn заново
             myRef.child("PlayerOnline").child(sessionID).removeValue().await()
-            Log.d("GameRepository", "Game session created/cleared: $sessionID")
+            
+            // Добавляем логирование для отладки
+            Log.d("GameRepository", "=== GAME SESSION CREATED/CLEARED ===")
+            Log.d("GameRepository", "SessionID: $sessionID")
+            Log.d("GameRepository", "=====================================")
         }
     }
     
@@ -376,12 +380,19 @@ class GameRepository {
      */
     suspend fun setupGameSession(sessionID: String, player1: String, player2: String): Result<Unit> {
         return runCatchingResult {
-            // Первый игрок получает "X" и ходит первым
+            // Первый игрок (player1) получает "X" и ходит первым
             myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").setValue(player1).await()
             myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(player1).await()
             myRef.child("PlayerOnline").child(sessionID).child("player1").setValue(player1).await()
             myRef.child("PlayerOnline").child(sessionID).child("player2").setValue(player2).await()
-            Log.d("GameRepository", "Game session setup: firstPlayer=$player1, currentTurn=$player1")
+            
+            // Добавляем логирование для отладки
+            Log.d("GameRepository", "=== GAME SESSION SETUP ===")
+            Log.d("GameRepository", "SessionID: $sessionID")
+            Log.d("GameRepository", "player1 (X): $player1")
+            Log.d("GameRepository", "player2 (O): $player2")
+            Log.d("GameRepository", "firstPlayer/currentTurn: $player1")
+            Log.d("GameRepository", "=========================")
         }
     }
     
