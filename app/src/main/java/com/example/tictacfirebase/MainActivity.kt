@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.animation.AnimationUtils
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -428,6 +429,18 @@ open class MainActivity : AppCompatActivity() {
 
     fun buClick(view: View) {
         val buSelected = view as Button
+        
+        // Воспроизводим анимацию нажатия
+        val scaleUp = AnimationUtils.loadAnimation(this, R.anim.click_scale)
+        val scaleDown = AnimationUtils.loadAnimation(this, R.anim.click_scale_back)
+        
+        buSelected.startAnimation(scaleUp)
+        
+        // Запускаем обратную анимацию с небольшой задержкой
+        buSelected.postDelayed({
+            buSelected.startAnimation(scaleDown)
+        }, 200)
+        
         var cellID = 0
         when (buSelected.id) {
             R.id.bu1 -> cellID = AppConstants.CellIds.CELL_1
