@@ -303,44 +303,53 @@ class GameRepository {
                     // Создаем массив из 9 элементов для доски 3x3
                     val board = Array<String?>(9) { null }
                     
+                    // Читаем все значения из snapshot в Map для удобного доступа
+                    val allData = mutableMapOf<String, String>()
+                    snapshot.children.forEach { child ->
+                        child.key?.let { key ->
+                            allData[key] = child.value.toString()
+                        }
+                    }
+                    
                     // Определяем первого игрока (кто ходит первым) - он всегда X
-                    val firstPlayer = snapshot.child("firstPlayer").value as? String ?: ""
-                    val player1 = snapshot.child("player1").value as? String ?: ""
-                    val player2 = snapshot.child("player2").value as? String ?: ""
+                    val firstPlayer = allData["firstPlayer"] ?: ""
+                    val player1 = allData["player1"] ?: ""
+                    val player2 = allData["player2"] ?: ""
                     
                     Log.d("GameRepository", "observeBoardState: firstPlayer=$firstPlayer, player1=$player1, player2=$player2")
                     
-                    snapshot.children.forEach { child ->
-                        val key = child.key
-                        // Пропускаем служебные ключи (firstPlayer, currentTurn, player1, player2 и т.д.)
-                        if (key != null && key.toIntOrNull() != null) {
-                            val index = key.toInt()
-                            if (index in 1..9) {
-                                val value = child.value.toString()
-                                
-                                // Если клетка пустая - оставляем null
-                                if (value.isBlank()) {
-                                    board[index - 1] = null
-                                    Log.d("GameRepository", "observeBoardState: cell $index is empty")
-                                    return@forEach
-                                }
-                                
-                                // ПРОСТАЯ ЛОГИКА: сравниваем email в клетке с firstPlayer
-                                // Если email == firstPlayer → это X
-                                // Если email == player2 (или любой другой email кроме firstPlayer) → это O
-                                val symbol = if (value == firstPlayer) {
-                                    "X"
-                                } else {
-                                    "O"
-                                }
-                                
-                                board[index - 1] = symbol
-                                Log.d(
-                                    "GameRepository",
-                                    "observeBoardState: cell $index = '$value' -> symbol '$symbol' (firstPlayer=$firstPlayer)"
-                                )
-                            }
+                    // Если firstPlayer пустой - значит данные ещё не готовы, выходим
+                    if (firstPlayer.isEmpty()) {
+                        Log.w("GameRepository", "observeBoardState: firstPlayer is empty, data not ready yet")
+                        trySend(board.toList())
+                        return
+                    }
+                    
+                    // Обрабатываем клетки 1-9
+                    for (i in 1..9) {
+                        val cellValue = allData[i.toString()] ?: ""
+                        
+                        // Если клетка пустая - оставляем null
+                        if (cellValue.isBlank()) {
+                            board[i - 1] = null
+                            Log.d("GameRepository", "observeBoardState: cell $i is empty")
+                            continue
                         }
+                        
+                        // ПРОСТАЯ ЛОГИКА: сравниваем email в клетке с firstPlayer
+                        // Если email == firstPlayer → это X
+                        // Если email != firstPlayer → это O
+                        val symbol = if (cellValue == firstPlayer) {
+                            "X"
+                        } else {
+                            "O"
+                        }
+                        
+                        board[i - 1] = symbol
+                        Log.d(
+                            "GameRepository",
+                            "observeBoardState: cell $i = '$cellValue' -> symbol '$symbol' (firstPlayer=$firstPlayer)"
+                        )
                     }
                     
                     Log.d("GameRepository", "observeBoardState: sending board state: ${board.toList()}")
@@ -604,11 +613,11 @@ class GameRepository {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
-                    // Наблюдаем за всем узлом сессии, а не только за currentTurn
-                    // Это гарантирует что мы получим обновление когда currentTurn изменится
+                    // Читаем currentTurn напрямую из child узла
                     val currentTurnSnapshot = snapshot.child("currentTurn")
-                    val currentTurn = currentTurnSnapshot.value as? String ?: ""
-                    Log.d("GameRepository", "observeCurrentTurn: currentTurn=$currentTurn for session=$sessionID")
+                    val currentTurn = currentTurnSnapshot.getValue(String::class.java) ?: ""
+                    
+                    Log.d("GameRepository", "observeCurrentTurn: currentTurn='$currentTurn' for session=$sessionID (snapshot children=${snapshot.childrenCount})")
                     trySend(currentTurn)
                 } catch (e: Exception) {
                     println("observeCurrentTurn error: $e")
@@ -622,11 +631,11 @@ class GameRepository {
             }
         }
         
-        // Слушаем конкретный child "currentTurn" для более эффективного обновления
-        myRef.child("PlayerOnline").child(sessionID).child("currentTurn").addValueEventListener(listener)
+        // Слушаем весь узел сессии чтобы получать все обновления
+        myRef.child("PlayerOnline").child(sessionID).addValueEventListener(listener)
         
         awaitClose {
-            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").removeEventListener(listener)
+            myRef.child("PlayerOnline").child(sessionID).removeEventListener(listener)
         }
     }
     
