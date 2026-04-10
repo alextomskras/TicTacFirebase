@@ -270,9 +270,15 @@ class GameViewModel(
 
         // Слушаем выход соперника
         viewModelScope.launch {
-            gameRepository.observeOpponentLeft(gameId).collect { hasLeft ->
-                if (hasLeft) {
-                    updateState { copy(gameStatus = GameStatus.OpponentLeft) }
+            _gameState.collect { state ->
+                if (state.sessionId.isNullOrEmpty()) {
+                    return@collect // Не наблюдаем пока нет sessionId
+                }
+                
+                gameRepository.observeOpponentLeft(state.sessionId).collect { hasLeft ->
+                    if (hasLeft) {
+                        updateState { copy(gameStatus = GameStatus.OpponentLeft) }
+                    }
                 }
             }
         }
@@ -376,9 +382,25 @@ class GameViewModel(
                 val result = gameRepository.sendGameRequest(fromEmail, toEmail)
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
                     // Запрос успешно отправлен (или уже существовал)
-                    // Создаем sessionId заранее (симметричный) и подписываемся на его создание
+                    // Создаем sessionId заранее (симметричный)
                     val sessionId = generateSessionId(fromEmail, toEmail)
                     
+                    // ВАЖНО: Создаем игровую сессию сразу при отправке запроса
+                    // Это позволяет обоим игрокам подписаться на изменения до принятия запроса
+                    val createResult = gameRepository.createGameSession(sessionId)
+                    if (createResult is com.example.tictacfirebase.utils.Result.Success) {
+                        // Настраиваем сессию: ОТПРАВИТЕЛЬ запроса (fromEmail) получает "X" и ходит первым
+                        val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
+                        
+                        if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
+                            Log.d("GameViewModel", "Game session created and setup for outgoing request")
+                        } else {
+                            Log.e("GameViewModel", "Setup failed: ${setupResult.message ?: "Unknown error"}")
+                        }
+                    } else {
+                        Log.e("GameViewModel", "Create failed: ${createResult.message ?: "Unknown error"}")
+                    }
+
                     // Обновляем состояние с sessionId - это запустит observeGameChanges
                     // Отправитель запроса будет player1 (X) и первым ходом
                     updateState { 

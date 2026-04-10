@@ -112,6 +112,11 @@ class GameRepository {
             Log.d("GameRepository", "=== GAME SESSION CREATED/CLEARED ===")
             Log.d("GameRepository", "SessionID: $sessionID")
             Log.d("GameRepository", "=====================================")
+            
+            // ВАЖНО: Создаем минимальную структуру сессии чтобы она существовала в БД
+            // Это позволяет observeBoardState и observeCurrentTurn подписаться на изменения
+            // даже до вызова setupGameSession
+            myRef.child("PlayerOnline").child(sessionID).child("initialized").setValue(true).await()
         }
     }
     

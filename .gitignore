@@ -1,12 +1,11 @@
-```
-# Compiled/Binary files
+# Compiled and build artifacts
 *.class
 *.o
 *.obj
+*.exe
+*.dll
 *.so
 *.a
-*.dll
-*.exe
 *.out
 
 # Dependencies
@@ -19,17 +18,15 @@ __pycache__/
 target/
 .gradle/
 
-# Build artifacts
+# Build directories
 build/
 dist/
-out/
 
-# IDE/Editor files
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
-*.tmp
 
 # System files
 .DS_Store
@@ -38,16 +35,32 @@ Thumbs.db
 .env.local
 *.env.*
 
-# Logs
+# Logs and coverage
 *.log
-
-# Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Android specific
-*.apk
-*.aar
-local.properties
-```
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
