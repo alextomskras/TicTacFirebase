@@ -144,15 +144,6 @@ class GameRepository {
     }
     
     /**
-     * Совершение хода в игре
-     */
-    suspend fun makeMove(sessionID: String, cellId: Int, playerEmail: String): Result<Unit> {
-        return runCatchingResult {
-            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(playerEmail).await()
-        }
-    }
-    
-    /**
      * Наблюдение за входящими запросами на игру (возвращает email отправителя)
      */
     fun observeGameRequests(userEmail: String): Flow<String> = callbackFlow {
@@ -258,13 +249,25 @@ class GameRepository {
                     // Создаем массив из 9 элементов для доски 3x3
                     val board = Array<String?>(9) { null }
                     
+                    // Получаем информацию об игроках для определения символов
+                    val player1Snapshot = snapshot.child("player1").value as? String ?: ""
+                    val player2Snapshot = snapshot.child("player2").value as? String ?: ""
+                    
                     snapshot.children.forEach { child ->
                         val key = child.key
                         // Пропускаем служебные ключи (firstPlayer, currentTurn, player1, player2 и т.д.)
                         if (key != null && key.toIntOrNull() != null) {
                             val index = key.toInt()
                             if (index in 1..9) {
-                                board[index - 1] = child.value.toString()
+                                val value = child.value.toString()
+                                // Определяем символ на основе email игрока
+                                val symbol = when {
+                                    value == player1Snapshot -> "X"
+                                    value == player2Snapshot -> "O"
+                                    value == "X" || value == "O" -> value // Уже сохранен как символ
+                                    else -> value
+                                }
+                                board[index - 1] = symbol
                             }
                         }
                     }
@@ -391,9 +394,9 @@ class GameRepository {
      */
     suspend fun makeMove(sessionID: String, cellId: Int, playerEmail: String, symbol: String): Result<Unit> {
         return runCatchingResult {
-            // Сохраняем ход в базу (Firebase использует ключи 1-9)
-            // cellId уже приходит в формате 1-9 из ViewModel
-            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(symbol).await()
+            // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
+            // observeBoardState затем преобразует email в символ (X/O) на основе player1/player2
+            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(playerEmail).await()
             
             // Переключаем текущий ход на следующего игрока
             val currentTurnSnapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()

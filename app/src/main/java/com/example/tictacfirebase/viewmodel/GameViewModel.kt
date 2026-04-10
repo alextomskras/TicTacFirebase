@@ -376,7 +376,23 @@ class GameViewModel(
                 val result = gameRepository.sendGameRequest(fromEmail, toEmail)
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
                     // Запрос успешно отправлен (или уже существовал)
-                    // НЕ создаем сессию игры здесь - сессия будет создана только когда получатель примет запрос
+                    // Создаем sessionId заранее (симметричный) и подписываемся на его создание
+                    val sessionId = generateSessionId(fromEmail, toEmail)
+                    
+                    // Обновляем состояние с sessionId - это запустит observeGameChanges
+                    // Отправитель запроса будет player1 (X) и первым ходом
+                    updateState { 
+                        copy(
+                            sessionId = sessionId,
+                            currentPlayerName = fromEmail,  // Текущий пользователь (отправитель)
+                            opponentName = toEmail,         // Соперник (получатель)
+                            isMyTurn = false,               // Пока не знаем, обновится через observeCurrentTurn
+                            gameStatus = GameStatus.WaitingForOpponent,
+                            boardState = List(9) { "" },
+                            isFirstPlayer = true            // Отправитель запроса всегда первый игрок (X)
+                        ) 
+                    }
+                    
                     sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail. Ожидайте подтверждения..."))
                 } else if (result is com.example.tictacfirebase.utils.Result.Error) {
                     val errorMessage = result.message ?: result.exception.message ?: "Неизвестная ошибка"
