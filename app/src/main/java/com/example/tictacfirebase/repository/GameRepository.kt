@@ -89,16 +89,29 @@ class GameRepository {
             
             // ВАЖНО: Создаем и настраиваем игровую сессию сразу при отправке запроса
             // Это позволяет обоим игрокам видеть сессию в БД до принятия запроса
+            // Также создаем начальную структуру для ходов (очищаем старые ходы если были)
             val sessionUpdates = mapOf(
                 "firstPlayer" to fromUser,
                 "currentTurn" to fromUser,
                 "player1" to fromUser,
                 "player2" to toUser,
                 "initialized" to true,
-                "sessionCreated" to System.currentTimeMillis()
+                "sessionCreated" to System.currentTimeMillis(),
+                // Явно создаем пустые клетки 1-9 для игрового поля
+                "1" to "",
+                "2" to "",
+                "3" to "",
+                "4" to "",
+                "5" to "",
+                "6" to "",
+                "7" to "",
+                "8" to "",
+                "9" to ""
             )
             myRef.child("PlayerOnline").child(sessionId).updateChildren(sessionUpdates).await()
+            
             Log.d("GameRepository", "Game session created and setup in PlayerOnline/$sessionId")
+            Log.d("GameRepository", "Initial game board with cells 1-9 created in database")
             
             // Сохраняем данные для FCM в отдельном узле для Cloud Function
             val fcmData = mapOf(

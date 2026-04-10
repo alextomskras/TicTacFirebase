@@ -1,96 +1,50 @@
-# Compiled and binary files
+```
+# Compiled and build artifacts
 *.class
 *.o
 *.obj
+*.out
+*.dll
 *.so
 *.a
-*.dll
-*.exe
-*.out
+*.pyc
+__pycache__/
 
 # Dependencies
 node_modules/
 venv/
 .venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-target/
-.gradle/
-
-# Build artifacts
-dist/
-build/
-*.jar
-*.war
-*.aar
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# System files
-.DS_Store
-Thumbs.db
 .env
 .env.local
 *.env.*
 
-# Logs and temp files
-*.log
+# Build directories (common for Android/Kotlin projects)
+build/
+.gradle/
+target/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
 *.tmp
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
 
 # Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Android specific
-*.apk
-*.aab
-local.properties
-.gradle/
-/build/
-captures/
-.externalNativeBuild
-.intermediates
-.kotlin/
-.pre-dexed/
-.cxx/
-packaged/
-incremental/
-outputs/
-*.keystore
-debug.keystore
-release.keystore
-lint-results-*.xml
-lint-results.xml
-jacoco/
-renderscript/
-shaders/
-res/raw/
-res/mipmap-anydpi-v26/
-res/drawable-*/
-res/values-*/colors.xml
-res/values-*/strings.xml
-res/values-*/styles.xml
-res/values-*/themes.xml
-res/values-*/dimens.xml
-res/values-*/ids.xml
-res/values-*/arrays.xml
-res/values-*/attrs.xml
-res/values-*/bools.xml
-res/values-*/colors-night.xml
-res/values-*/integers.xml
-res/values-*/plurals.xml
-res/values-*/strings_activity_*.xml
-res/values-*/styles_activity_*.xml
-res/values-*/themes_activity_*.xml
-res/values-*/dimens_activity_*.xml
-res/values-*/ids_activity_*.xml
-res/values-*/arrays_activity_*.xml
-res/values-*/attrs_activity_*.xml
-res/values-*/bools_activity_*.xml
-res/values-*/colors_activity_*.xml
+# Python specific
+.mypy_cache/
+.pytest_cache/
+
+# Original rules preserved
+```

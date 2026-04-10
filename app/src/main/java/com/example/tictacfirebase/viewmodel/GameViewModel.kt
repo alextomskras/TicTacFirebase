@@ -391,14 +391,14 @@ class GameViewModel(
                             sessionId = generateSessionId(fromEmail, toEmail),
                             currentPlayerName = fromEmail,  // Текущий пользователь (отправитель)
                             opponentName = toEmail,         // Соперник (получатель)
-                            isMyTurn = false,               // Пока не знаем, обновится через observeCurrentTurn
-                            gameStatus = GameStatus.WaitingForOpponent,
+                            isMyTurn = true,                // Отправитель запроса ходит первым
+                            gameStatus = GameStatus.Playing,
                             boardState = List(9) { "" },
                             isFirstPlayer = true            // Отправитель запроса всегда первый игрок (X)
                         ) 
                     }
                     
-                    sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail. Ожидайте подтверждения..."))
+                    sendEffect(UiEffect.ShowToast("Запрос отправлен пользователю $toEmail. Игра началась! Ваш ход (X)"))
                 } else if (result is com.example.tictacfirebase.utils.Result.Error) {
                     val errorMessage = result.message ?: result.exception.message ?: "Неизвестная ошибка"
                     // Проверяем, это ошибка "встречного приглашения"?
