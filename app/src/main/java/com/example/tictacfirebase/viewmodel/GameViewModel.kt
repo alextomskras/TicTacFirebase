@@ -456,10 +456,10 @@ class GameViewModel(
                 Log.d("GameViewModel", "setupGameSession completed with result: $setupResult")
                 
                 if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
-                    // Очищаем запрос ПОСЛЕ успешной настройки сессии
-                    Log.d("GameViewModel", "Clearing user requests...")
-                    gameRepository.clearUserRequests(toEmail)
-                    Log.d("GameViewModel", "User requests cleared")
+//                    // Очищаем запрос ПОСЛЕ успешной настройки сессии
+//                    Log.d("GameViewModel", "Clearing user requests...")
+//                    gameRepository.clearUserRequests(toEmail)
+//                    Log.d("GameViewModel", "User requests cleared")
                     
                     // Загружаем аватарки ПЕРЕД обновлением состояния
                     val myAvatarResult = gameRepository.getUserProfileImage(toEmail)
