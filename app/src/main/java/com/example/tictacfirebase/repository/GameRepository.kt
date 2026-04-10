@@ -413,6 +413,7 @@ class GameRepository {
     /**
      * Настройка игровой сессии после создания
      * Устанавливает первого игрока, текущий ход и имена игроков
+     * Также гарантирует наличие пустого игрового поля (клетки 1-9)
      */
     suspend fun setupGameSession(sessionID: String, player1: String, player2: String): Result<Unit> {
         return runCatchingResult {
@@ -423,7 +424,18 @@ class GameRepository {
                 "currentTurn" to player1,
                 "player1" to player1,
                 "player2" to player2,
-                "initialized" to true
+                "initialized" to true,
+                // Явно создаем пустые клетки 1-9 для игрового поля
+                // Это гарантирует что поле существует даже если было удалено
+                "1" to "",
+                "2" to "",
+                "3" to "",
+                "4" to "",
+                "5" to "",
+                "6" to "",
+                "7" to "",
+                "8" to "",
+                "9" to ""
             )
             
             myRef.child("PlayerOnline").child(sessionID).updateChildren(updates).await()
@@ -434,6 +446,7 @@ class GameRepository {
             Log.d("GameRepository", "player1 (X): $player1")
             Log.d("GameRepository", "player2 (O): $player2")
             Log.d("GameRepository", "firstPlayer/currentTurn: $player1")
+            Log.d("GameRepository", "Game board cells 1-9 initialized")
             Log.d("GameRepository", "=========================")
         }
     }
