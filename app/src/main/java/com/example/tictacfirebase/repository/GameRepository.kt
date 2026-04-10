@@ -303,14 +303,12 @@ class GameRepository {
                     // Создаем массив из 9 элементов для доски 3x3
                     val board = Array<String?>(9) { null }
                     
-                    // Получаем информацию об игроках для определения символов
-                    val player1Snapshot = snapshot.child("player1").value as? String ?: ""
-                    val player2Snapshot = snapshot.child("player2").value as? String ?: ""
-                    
-                    Log.d("GameRepository", "observeBoardState: player1=$player1Snapshot, player2=$player2Snapshot")
-                    
                     // Определяем первого игрока (кто ходит первым) - он всегда X
-                    val firstPlayer = snapshot.child("firstPlayer").value as? String ?: player1Snapshot
+                    val firstPlayer = snapshot.child("firstPlayer").value as? String ?: ""
+                    val player1 = snapshot.child("player1").value as? String ?: ""
+                    val player2 = snapshot.child("player2").value as? String ?: ""
+                    
+                    Log.d("GameRepository", "observeBoardState: firstPlayer=$firstPlayer, player1=$player1, player2=$player2")
                     
                     snapshot.children.forEach { child ->
                         val key = child.key
@@ -320,42 +318,26 @@ class GameRepository {
                             if (index in 1..9) {
                                 val value = child.value.toString()
                                 
-                                // Если клетка пустая - пропускаем
+                                // Если клетка пустая - оставляем null
                                 if (value.isBlank()) {
-                                    board[index - 1] = ""
+                                    board[index - 1] = null
+                                    Log.d("GameRepository", "observeBoardState: cell $index is empty")
                                     return@forEach
                                 }
                                 
-                                // Определяем символ на основе email игрока
-                                // ВАЖНО: firstPlayer всегда получает X, второй игрок получает O
-                                val symbol = when {
-                                    value == firstPlayer -> "X"
-                                    value == player1Snapshot && player1Snapshot != firstPlayer -> "O"
-                                    value == player2Snapshot -> {
-                                        if (player2Snapshot == firstPlayer) "X" else "O"
-                                    }
-                                    value == "X" -> "X"
-                                    value == "O" -> "O"
-                                    else -> {
-                                        // Fallback: если не можем определить, оставляем как есть
-                                        Log.w(
-                                            "GameRepository",
-                                            "Unknown value in cell $index: '$value' (firstPlayer=$firstPlayer, player1=$player1Snapshot, player2=$player2Snapshot)"
-                                        )
-                                        // Пытаемся определить по текущему ходу
-                                        val currentTurn = snapshot.child("currentTurn").value as? String ?: ""
-                                        if (value == currentTurn) {
-                                            // Это только что сделанный ход - определяем по firstPlayer
-                                            if (firstPlayer == value) "X" else "O"
-                                        } else {
-                                            value
-                                        }
-                                    }
+                                // ПРОСТАЯ ЛОГИКА: сравниваем email в клетке с firstPlayer
+                                // Если email == firstPlayer → это X
+                                // Если email == player2 (или любой другой email кроме firstPlayer) → это O
+                                val symbol = if (value == firstPlayer) {
+                                    "X"
+                                } else {
+                                    "O"
                                 }
+                                
                                 board[index - 1] = symbol
                                 Log.d(
                                     "GameRepository",
-                                    "observeBoardState: cell $index = '$value' -> symbol '$symbol'"
+                                    "observeBoardState: cell $index = '$value' -> symbol '$symbol' (firstPlayer=$firstPlayer)"
                                 )
                             }
                         }
