@@ -382,30 +382,13 @@ class GameViewModel(
                 val result = gameRepository.sendGameRequest(fromEmail, toEmail)
                 if (result is com.example.tictacfirebase.utils.Result.Success) {
                     // Запрос успешно отправлен (или уже существовал)
-                    // Создаем sessionId заранее (симметричный)
-                    val sessionId = generateSessionId(fromEmail, toEmail)
+                    // Сессия уже создана в sendGameRequest() - там же где и запрос
                     
-                    // ВАЖНО: Создаем игровую сессию сразу при отправке запроса
-                    // Это позволяет обоим игрокам подписаться на изменения до принятия запроса
-                    val createResult = gameRepository.createGameSession(sessionId)
-                    if (createResult is com.example.tictacfirebase.utils.Result.Success) {
-                        // Настраиваем сессию: ОТПРАВИТЕЛЬ запроса (fromEmail) получает "X" и ходит первым
-                        val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
-                        
-                        if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
-                            Log.d("GameViewModel", "Game session created and setup for outgoing request")
-                        } else {
-                            Log.e("GameViewModel", "Setup failed: ${setupResult.message ?: "Unknown error"}")
-                        }
-                    } else {
-                        Log.e("GameViewModel", "Create failed: ${createResult.message ?: "Unknown error"}")
-                    }
-
                     // Обновляем состояние с sessionId - это запустит observeGameChanges
                     // Отправитель запроса будет player1 (X) и первым ходом
                     updateState { 
                         copy(
-                            sessionId = sessionId,
+                            sessionId = generateSessionId(fromEmail, toEmail),
                             currentPlayerName = fromEmail,  // Текущий пользователь (отправитель)
                             opponentName = toEmail,         // Соперник (получатель)
                             isMyTurn = false,               // Пока не знаем, обновится через observeCurrentTurn
@@ -468,53 +451,44 @@ class GameViewModel(
                 val sessionId = generateSessionId(fromEmail, toEmail)
                 Log.d("GameViewModel", "Generated SessionID: $sessionId")
                 
-                // Сначала создаем сессию (очищаем старую)
-                val createResult = gameRepository.createGameSession(sessionId)
+                // Сессия уже должна быть создана в sendGameRequest(), но на всякий случай убеждаемся что она существует
+                // setupGameSession обновит все поля если сессия уже есть
+                val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
                 
-                if (createResult is com.example.tictacfirebase.utils.Result.Success) {
-                    // Настраиваем сессию: ОТПРАВИТЕЛЬ запроса (fromEmail) получает "X" и ходит первым
-                    // Получатель запроса (toEmail) получает "O" и ходит вторым
-                    val setupResult = gameRepository.setupGameSession(sessionId, fromEmail, toEmail)
+                if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
+                    // Загружаем аватарки ПЕРЕД обновлением состояния
+                    val myAvatarResult = gameRepository.getUserProfileImage(toEmail)
+                    val opponentAvatarResult = gameRepository.getUserProfileImage(fromEmail)
                     
-                    if (setupResult is com.example.tictacfirebase.utils.Result.Success) {
-                        // Загружаем аватарки ПЕРЕД обновлением состояния
-                        val myAvatarResult = gameRepository.getUserProfileImage(toEmail)
-                        val opponentAvatarResult = gameRepository.getUserProfileImage(fromEmail)
-                        
-                        val myAvatar = if (myAvatarResult is com.example.tictacfirebase.utils.Result.Success) myAvatarResult.data else null
-                        val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
-                        
-                        // Обновляем sessionId в состоянии - это вызовет обновление gameId и перезапуск наблюдения
-                        // Принявший запрос (toEmail) является вторым игроком (O), значит isFirstPlayer = false
-                        updateState { 
-                            copy(
-                                sessionId = sessionId,
-                                currentPlayerName = toEmail,  // Текущий пользователь (принявший запрос)
-                                opponentName = fromEmail,     // Соперник (отправитель запроса)
-                                playerAvatarUrl = myAvatar,
-                                opponentAvatarUrl = opponentAvatar,
-                                isMyTurn = false,             // Отправитель (X) ходит первым, поэтому у текущего пользователя (O) не его ход
-                                gameStatus = GameStatus.Playing,
-                                boardState = List(9) { "" },   // Очищаем доску
-                                isFirstPlayer = false          // Принявший запрос всегда второй игрок (O)
-                            ) 
-                        }
-                        
-                        Log.d("GameViewModel", "Game session successfully created and setup!")
-                        Log.d("GameViewModel", "Current user ($toEmail) is player2 (O)")
-                        Log.d("GameViewModel", "Opponent ($fromEmail) is player1 (X) and goes first")
-                        
-                        sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите вторым (O). $fromEmail ходит первым (X)"))
-                        // НЕ вызываем loadInitialData() - observeGameChanges уже наблюдает за изменениями через Flow
-                    } else if (setupResult is com.example.tictacfirebase.utils.Result.Error) {
-                        val errorMessage = setupResult.message ?: setupResult.exception.message ?: "Неизвестная ошибка"
-                        Log.e("GameViewModel", "Setup failed: $errorMessage")
-                        sendEffect(UiEffect.ShowToast("Ошибка настройки игры: $errorMessage"))
+                    val myAvatar = if (myAvatarResult is com.example.tictacfirebase.utils.Result.Success) myAvatarResult.data else null
+                    val opponentAvatar = if (opponentAvatarResult is com.example.tictacfirebase.utils.Result.Success) opponentAvatarResult.data else null
+                    
+                    // Обновляем sessionId в состоянии - это вызовет обновление gameId и перезапуск наблюдения
+                    // Принявший запрос (toEmail) является вторым игроком (O), значит isFirstPlayer = false
+                    updateState { 
+                        copy(
+                            sessionId = sessionId,
+                            currentPlayerName = toEmail,  // Текущий пользователь (принявший запрос)
+                            opponentName = fromEmail,     // Соперник (отправитель запроса)
+                            playerAvatarUrl = myAvatar,
+                            opponentAvatarUrl = opponentAvatar,
+                            isMyTurn = false,             // Отправитель (X) ходит первым, поэтому у текущего пользователя (O) не его ход
+                            gameStatus = GameStatus.Playing,
+                            boardState = List(9) { "" },   // Очищаем доску
+                            isFirstPlayer = false          // Принявший запрос всегда второй игрок (O)
+                        ) 
                     }
-                } else if (createResult is com.example.tictacfirebase.utils.Result.Error) {
-                    val errorMessage = createResult.message ?: createResult.exception.message ?: "Неизвестная ошибка"
-                    Log.e("GameViewModel", "Create failed: $errorMessage")
-                    sendEffect(UiEffect.ShowToast("Ошибка создания игры: $errorMessage"))
+                    
+                    Log.d("GameViewModel", "Game session successfully created and setup!")
+                    Log.d("GameViewModel", "Current user ($toEmail) is player2 (O)")
+                    Log.d("GameViewModel", "Opponent ($fromEmail) is player1 (X) and goes first")
+                    
+                    sendEffect(UiEffect.ShowToast("Игра началась! Вы ходите вторым (O). $fromEmail ходит первым (X)"))
+                    // НЕ вызываем loadInitialData() - observeGameChanges уже наблюдает за изменениями через Flow
+                } else if (setupResult is com.example.tictacfirebase.utils.Result.Error) {
+                    val errorMessage = setupResult.message ?: setupResult.exception.message ?: "Неизвестная ошибка"
+                    Log.e("GameViewModel", "Setup failed: $errorMessage")
+                    sendEffect(UiEffect.ShowToast("Ошибка настройки игры: $errorMessage"))
                 }
             } finally {
                 updateState { copy(isLoading = false) }
