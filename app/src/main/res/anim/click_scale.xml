@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Анимация нажатия: кнопка подпрыгивает и увеличивается -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/overshoot_interpolator"
+    android:duration="200">
+    
+    <scale
+        android:fromXScale="1.0"
+        android:toXScale="1.15"
+        android:fromYScale="1.0"
+        android:toYScale="1.15"
+        android:pivotX="50%"
+        android:pivotY="50%" />
+    
+    <alpha
+        android:fromAlpha="1.0"
+        android:toAlpha="0.9" />
+</set>

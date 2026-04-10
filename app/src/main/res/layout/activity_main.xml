@@ -44,16 +44,6 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:text="@string/accept" />
-
-        <!-- Кнопка меню заменена на выпадающее меню -->
-        <ImageButton
-                android:id="@+id/btnMenu"
-                android:layout_width="48dp"
-                android:layout_height="match_parent"
-                android:layout_marginStart="3pt"
-                android:background="@drawable/rounded_button_request"
-                android:contentDescription="Меню"
-                android:src="@android:drawable/ic_menu_more" />
     </LinearLayout>
 
     <!-- Индикатор загрузки -->

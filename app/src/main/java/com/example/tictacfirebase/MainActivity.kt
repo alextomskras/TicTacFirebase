@@ -4,22 +4,26 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
+import android.view.animation.AnimationUtils
 import android.widget.Button
-import android.widget.ImageButton
-import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import coil.load
+import com.example.tictacfirebase.model.UiEffect
 import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
 import com.example.tictacfirebase.utils.AppConstants
 import com.example.tictacfirebase.utils.NetworkMonitor
+import com.example.tictacfirebase.utils.isValidEmail
 import com.example.tictacfirebase.utils.splitEmail
 import com.example.tictacfirebase.utils.splitEmailFull
 import com.example.tictacfirebase.viewmodel.GameViewModel
@@ -28,10 +32,9 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
-import coil.load
-import com.example.tictacfirebase.model.UiEffect
 import kotlinx.coroutines.launch
-import java.util.Random
+import kotlinx.coroutines.tasks.await
+import java.util.*
 
 open class MainActivity : AppCompatActivity() {
 
@@ -51,7 +54,6 @@ open class MainActivity : AppCompatActivity() {
     private lateinit var progressBar: android.widget.ProgressBar
     private lateinit var tvConnectionStatus: android.widget.TextView
     private lateinit var noInternetOverlay: android.widget.FrameLayout
-    private lateinit var btnMenu: ImageButton
     
     // GameViewModel для управления состоянием игры и сетью
     private lateinit var gameViewModel: GameViewModel
@@ -82,10 +84,8 @@ open class MainActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
         noInternetOverlay = findViewById(R.id.noInternetOverlay)
-        btnMenu = findViewById(R.id.btnMenu)
         
-        // Настройка выпадающего меню
-        setupPopupMenu()
+        // Настройка ActionBar будет выполнена в onCreateOptionsMenu
         
         // Инициализация GameRepository для передачи в ViewModel
         val gameRepository = GameRepository()
@@ -353,6 +353,8 @@ open class MainActivity : AppCompatActivity() {
      */
     private fun updateConnectionStatus(status: String) {
         tvConnectionStatus.text = status
+        // Не показываем progressBar, если loading уже false
+        progressBar.visibility = View.GONE
     }
     
     /**
@@ -396,23 +398,20 @@ open class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshTokens(): String? {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
-                return@addOnCompleteListener
-            }
-            val newToken = task.result
-            Log.d("newToken", newToken)
-            
-            // Обновляем токен в базе данных с использованием lifecycleScope через ViewModel
-            myEmail?.let { email ->
-                lifecycleScope.launch {
+    private fun refreshTokens() {
+        // Используем lifecycleScope для корректной работы с корутинами
+        lifecycleScope.launch {
+            try {
+                val newToken = FirebaseMessaging.getInstance().token.await()
+                Log.d(TAG, "FCM token received: $newToken")
+                
+                // Обновляем токен в базе данных
+                myEmail?.let { email ->
                     try {
                         showLoading(true)
                         gameViewModel.updateUserToken(email.splitEmail(), newToken)
                         updateConnectionStatus(getString(R.string.connected))
-                        Log.e(TAG, "Create updating token: ${newToken}")
+                        Log.d(TAG, "Token updated successfully for user: ${email.splitEmail()}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error updating token: ${e.message}")
                         updateConnectionStatus(getString(R.string.error_connection))
@@ -420,13 +419,28 @@ open class MainActivity : AppCompatActivity() {
                         showLoading(false)
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Fetching FCM registration token failed: ${e.message}")
+                updateConnectionStatus(getString(R.string.error_connection))
+                showLoading(false)
             }
         }
-        return null
     }
 
     fun buClick(view: View) {
         val buSelected = view as Button
+        
+        // Воспроизводим анимацию нажатия
+        val scaleUp = AnimationUtils.loadAnimation(this, R.anim.click_scale)
+        val scaleDown = AnimationUtils.loadAnimation(this, R.anim.click_scale_back)
+        
+        buSelected.startAnimation(scaleUp)
+        
+        // Запускаем обратную анимацию с небольшой задержкой
+        buSelected.postDelayed({
+            buSelected.startAnimation(scaleDown)
+        }, 200)
+        
         var cellID = 0
         when (buSelected.id) {
             R.id.bu1 -> cellID = AppConstants.CellIds.CELL_1
@@ -445,11 +459,17 @@ open class MainActivity : AppCompatActivity() {
     }
 
     fun buRequestEvent(view: View) {
-        val userDemail = etEmail.text.toString()
+        val userDemail = etEmail.text.toString().trim()
         
         // Проверяем, не пустой ли email
         if (userDemail.isBlank()) {
             Toast.makeText(this, "Введите email пользователя", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Валидация email формата
+        if (!userDemail.isValidEmail()) {
+            Toast.makeText(this, "Некорректный формат email", Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -459,82 +479,85 @@ open class MainActivity : AppCompatActivity() {
             return
         }
         
-        Log.d(TAG, "From: " + userDemail)
+        Log.d(TAG, "Sending request to: $userDemail")
         
         // Показываем индикатор загрузки во время отправки запроса
         showLoading(true)
         
-        //unHide player2 icon
-        player2TextView.visibility = View.VISIBLE
-        imageViewUser2.visibility = View.VISIBLE
-        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
-
-        // Загружаем аватар противника
+        // Загружаем аватар противника и показываем UI
         lifecycleScope.launch {
             try {
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                imageViewUser2.load(opponentAvatarUrl)
+                
+                // Показываем аватар и имя противника ТОЛЬКО после успешной загрузки аватара
+                player2TextView.visibility = View.VISIBLE
+                imageViewUser2.visibility = View.VISIBLE
+                player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
+                
+                if (opponentAvatarUrl != null) {
+                    imageViewUser2.load(opponentAvatarUrl) {
+                        crossfade(true)
+                        placeholder(R.drawable.ic_fire_emoji)
+                        error(R.drawable.ic_fire_emoji)
+                    }
+                }
+                
+                // Отправляем событие в ViewModel после загрузки аватара
+                gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending request: ${e.message}")
+                Toast.makeText(this@MainActivity, "Ошибка отправки запроса: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 // Скрываем индикатор загрузки после завершения
                 showLoading(false)
             }
         }
-
-        // Отправляем событие в ViewModel
-        Log.d(TAG, "From: onEvent" + myEmail + userDemail)
-        gameViewModel.onEvent(UiEvent.SendGameRequest(myEmail!!, userDemail))
     }
 
 
     fun buAcceptEvent(view: View) {
-        val userDemail = etEmail.text.toString()
+        val userDemail = etEmail.text.toString().trim()
+        
+        // Валидация email формата
+        if (!userDemail.isValidEmail()) {
+            Toast.makeText(this, "Некорректный формат email", Toast.LENGTH_SHORT).show()
+            return
+        }
         
         // Показываем индикатор загрузки во время принятия запроса
         showLoading(true)
         
-        //unHide player2 icon
-        player2TextView.visibility = View.VISIBLE
-        imageViewUser2.visibility = View.VISIBLE
-        player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
-        
-        // Загружаем аватар противника
+        // Загружаем аватар противника и показываем UI
         lifecycleScope.launch {
             try {
                 val opponentAvatarUrl = loadOpponentAvatar(userDemail)
-                imageViewUser2.load(opponentAvatarUrl)
+                
+                // Показываем аватар и имя противника ТОЛЬКО после успешной загрузки аватара
+                player2TextView.visibility = View.VISIBLE
+                imageViewUser2.visibility = View.VISIBLE
+                player2TextView.text = getString(R.string.player2_label, splitEmailFull(userDemail))
+                
+                if (opponentAvatarUrl != null) {
+                    imageViewUser2.load(opponentAvatarUrl) {
+                        crossfade(true)
+                        placeholder(R.drawable.ic_fire_emoji)
+                        error(R.drawable.ic_fire_emoji)
+                    }
+                }
+                
+                // Отправляем событие в ViewModel после загрузки аватара
+                gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
+
+                // Деактивируем кнопку принятия после успешного принятия запроса
+                buAcceptEvent.isEnabled = false
+                buAcceptEvent.tag = "disabled"
+            } catch (e: Exception) {
+                Log.e(TAG, "Error accepting request: ${e.message}")
+                Toast.makeText(this@MainActivity, "Ошибка принятия запроса: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 // Скрываем индикатор загрузки после завершения
                 showLoading(false)
             }
-        }
-
-        // Отправляем событие в ViewModel
-        gameViewModel.onEvent(UiEvent.AcceptGameRequest(userDemail, myEmail!!))
-    }
-
-    /**
-     * Настройка выпадающего меню с кнопками "Новая игра" и "Выйти"
-     */
-    private fun setupPopupMenu() {
-        btnMenu.setOnClickListener { view ->
-            val popup = PopupMenu(this, view)
-            popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
-            
-            popup.setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    R.id.action_new_game -> {
-                        startNewGame()
-                        true
-                    }
-                    R.id.action_logout -> {
-                        buLogoutEvent(view)
-                        true
-                    }
-                    else -> false
-                }
-            }
-            
-            popup.show()
         }
     }
     
@@ -642,5 +665,34 @@ open class MainActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.restart_game_message), Toast.LENGTH_LONG).show()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        
+        // Устанавливаем кастомную иконку overflow (три полосочки вместо трех точек)
+//        supportActionBar?.setOverflowIcon(getDrawable(R.drawable.ic_menu_overflow))
+        
+        // Скрываем стандартную кнопку "домой" - стандартный overflow (три точки) будет показан автоматически
+        supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        supportActionBar?.setDisplayShowHomeEnabled(false)
+        
+        return true
+    }
+
+    /**
+     * Обработка выбора пунктов меню
+     */
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_new_game -> {
+                startNewGame()
+                true
+            }
+            R.id.action_logout -> {
+                buLogoutEvent(findViewById(android.R.id.content))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
 
 }
