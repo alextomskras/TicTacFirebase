@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
@@ -175,110 +176,116 @@ class GameViewModel(
     }
 
     private fun observeGameChanges() {
-        viewModelScope.launch {
-            gameRepository.observeBoardState(gameId).collect { board ->
-                _gameState.value.currentPlayerName
-                
-                // Обновляем состояние доски
-                val newBoardState = board.map { it ?: "" }
-                
-                // Определяем результат игры с помощью GameManager
-                // Преобразуем доску в формат, понятный GameManager (списки ходов)
-                val player1Moves = mutableListOf<Int>()
-                val player2Moves = mutableListOf<Int>()
-                newBoardState.forEachIndexed { index, value ->
-                    if (value == "X") {
-                        player1Moves.add(index + 1)
-                    } else if (value == "O") {
-                        player2Moves.add(index + 1)
-                    }
-                }
-                
-                // Создаем временное состояние для проверки победы
-                val tempGameState = com.example.tictacfirebase.game.GameState(
-                    player1Moves = player1Moves,
-                    player2Moves = player2Moves
-                )
-                
-                // Проверяем победителя
-                val winResult = checkWin(tempGameState)
-                
-                // Определяем статус игры на основе результата
-                // Используем isFirstPlayer для определения кто я (X или O)
-                val currentState = _gameState.value
-                val newStatus = when {
-                    winResult?.winner == "Player1" -> {
-                        // Победил игрок с X. Если я первый игрок (X), то я победил
-                        if (currentState.isFirstPlayer) GameStatus.Won else GameStatus.Lost
-                    }
-                    winResult?.winner == "Player2" -> {
-                        // Победил игрок с O. Если я не первый игрок (значит я O), то я победил
-                        if (!currentState.isFirstPlayer) GameStatus.Won else GameStatus.Lost
-                    }
-                    winResult?.winner == "Draw" -> GameStatus.Draw
-                    else -> GameStatus.Playing
-                }
-
-                updateState {
-                    copy(
-                        boardState = newBoardState,
-                        gameStatus = newStatus
-                        // isMyTurn обновляется отдельно через observeCurrentTurn для избежания race condition
-                    )
-                }
-            }
-        }
-
-        // Отдельное наблюдение за изменениями текущего хода для быстрого обновления UI
-        viewModelScope.launch {
-            gameRepository.observeCurrentTurn(gameId).collect { currentTurn ->
-                val currentState = _gameState.value
-                // Определяем имя текущего пользователя - берем из состояния если уже установлено
-                var myName = currentState.currentPlayerName
-                
-                // Если имя еще не установлено, пытаемся определить из сессии
-                if (myName.isEmpty() && currentTurn.isNotEmpty()) {
-                    // Получаем информацию о сессии чтобы определить кто есть кто
-                    val sessionInfoResult = gameRepository.getSessionInfo(gameId)
-                    if (sessionInfoResult is com.example.tictacfirebase.utils.Result.Success) {
-                        val sessionInfo = sessionInfoResult.data
-                        // Предполагаем что текущий пользователь это player1 если его ход или он первый игрок
-                        myName = sessionInfo.player1.ifEmpty { sessionInfo.firstPlayer }
-                        
-                        // Обновляем opponentName и isFirstPlayer
-                        val opponentName = sessionInfo.player2
-                        val amIPlayer1 = (myName == sessionInfo.player1)
-                        
-                        updateState {
-                            copy(
-                                currentPlayerName = myName,
-                                opponentName = opponentName,
-                                isFirstPlayer = amIPlayer1,
-                                isMyTurn = currentTurn == myName
-                            )
-                        }
-                        return@collect
-                    }
-                }
-                
-                val isMyTurn = currentTurn == myName
-                
-                updateState {
-                    copy(isMyTurn = isMyTurn)
-                }
-            }
-        }
-
-        // Слушаем выход соперника
+        // Наблюдаем за изменениями sessionId и перезапускаем слушатели при изменении
         viewModelScope.launch {
             _gameState.collect { state ->
-                if (state.sessionId.isNullOrEmpty()) {
+                val sessionId = state.sessionId
+                if (sessionId.isNullOrEmpty()) {
                     return@collect // Не наблюдаем пока нет sessionId
                 }
                 
-                gameRepository.observeOpponentLeft(state.sessionId).collect { hasLeft ->
-                    if (hasLeft) {
-                        updateState { copy(gameStatus = GameStatus.OpponentLeft) }
+                // Очищаем предыдущие наблюдения будут автоматически очищены через awaitClose
+                
+                // Запускаем наблюдение за доской
+                launch {
+                    gameRepository.observeBoardState(sessionId).collect { board ->
+                        val currentState = _gameState.value
+                        
+                        // Обновляем состояние доски
+                        val newBoardState = board.map { it ?: "" }
+                        
+                        // Определяем результат игры с помощью GameManager
+                        // Преобразуем доску в формат, понятный GameManager (списки ходов)
+                        val player1Moves = mutableListOf<Int>()
+                        val player2Moves = mutableListOf<Int>()
+                        newBoardState.forEachIndexed { index, value ->
+                            if (value == "X") {
+                                player1Moves.add(index + 1)
+                            } else if (value == "O") {
+                                player2Moves.add(index + 1)
+                            }
+                        }
+                        
+                        // Создаем временное состояние для проверки победы
+                        val tempGameState = com.example.tictacfirebase.game.GameState(
+                            player1Moves = player1Moves,
+                            player2Moves = player2Moves
+                        )
+                        
+                        // Проверяем победителя
+                        val winResult = checkWin(tempGameState)
+                        
+                        // Определяем статус игры на основе результата
+                        // Используем isFirstPlayer для определения кто я (X или O)
+                        val newStatus = when {
+                            winResult?.winner == "Player1" -> {
+                                // Победил игрок с X. Если я первый игрок (X), то я победил
+                                if (currentState.isFirstPlayer) GameStatus.Won else GameStatus.Lost
+                            }
+                            winResult?.winner == "Player2" -> {
+                                // Победил игрок с O. Если я не первый игрок (значит я O), то я победил
+                                if (!currentState.isFirstPlayer) GameStatus.Won else GameStatus.Lost
+                            }
+                            winResult?.winner == "Draw" -> GameStatus.Draw
+                            else -> GameStatus.Playing
+                        }
+
+                        updateState {
+                            copy(
+                                boardState = newBoardState,
+                                gameStatus = newStatus
+                                // isMyTurn обновляется отдельно через observeCurrentTurn для избежания race condition
+                            )
+                        }
+                    }
+                }
+
+                // Запускаем наблюдение за текущим ходом
+                launch {
+                    gameRepository.observeCurrentTurn(sessionId).collect { currentTurn ->
+                        val currentState = _gameState.value
+                        // Определяем имя текущего пользователя - берем из состояния если уже установлено
+                        var myName = currentState.currentPlayerName
+                        
+                        // Если имя еще не установлено, пытаемся определить из сессии
+                        if (myName.isEmpty() && currentTurn.isNotEmpty()) {
+                            // Получаем информацию о сессии чтобы определить кто есть кто
+                            val sessionInfoResult = gameRepository.getSessionInfo(sessionId)
+                            if (sessionInfoResult is com.example.tictacfirebase.utils.Result.Success) {
+                                val sessionInfo = sessionInfoResult.data
+                                // Предполагаем что текущий пользователь это player1 если его ход или он первый игрок
+                                myName = sessionInfo.player1.ifEmpty { sessionInfo.firstPlayer }
+                                
+                                // Обновляем opponentName и isFirstPlayer
+                                val opponentName = sessionInfo.player2
+                                val amIPlayer1 = (myName == sessionInfo.player1)
+                                
+                                updateState {
+                                    copy(
+                                        currentPlayerName = myName,
+                                        opponentName = opponentName,
+                                        isFirstPlayer = amIPlayer1,
+                                        isMyTurn = currentTurn == myName
+                                    )
+                                }
+                                return@collect
+                            }
+                        }
+                        
+                        val isMyTurn = currentTurn == myName
+                        
+                        updateState {
+                            copy(isMyTurn = isMyTurn)
+                        }
+                    }
+                }
+                
+                // Запускаем наблюдение за выходом соперника
+                launch {
+                    gameRepository.observeOpponentLeft(sessionId).collect { hasLeft ->
+                        if (hasLeft) {
+                            updateState { copy(gameStatus = GameStatus.OpponentLeft) }
+                        }
                     }
                 }
             }
