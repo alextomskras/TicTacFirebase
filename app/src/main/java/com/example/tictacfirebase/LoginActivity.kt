@@ -6,11 +6,16 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.tictacfirebase.databinding.ActivityLoginBinding
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 class LoginActivity : AppCompatActivity() {
     companion object {
@@ -96,26 +101,29 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun refreshTokens(stripEmail: String) {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w(tag, "Fetching FCM registration token failed", task.exception)
+        lifecycleScope.launch {
+            try {
+                val newToken = FirebaseMessaging.getInstance().token.await()
+                Log.d("FCM_TOKEN", "Token fetched successfully: $newToken")
+
+                if (newToken != null) {
+                    withContext(Dispatchers.IO) {
+                        MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+                    }
+                    
+                    val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
+                    ref.setValue(newToken)
+                        .addOnSuccessListener {
+                            Log.d(tag, "Successfully saved Token to Firebase Database")
+                        }
+                        .addOnFailureListener {
+                            Log.d(tag, "Failed to save token to database: ${it.message}")
+                        }
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "Fetching FCM registration token failed", e)
                 hideLoading()
-                return@addOnCompleteListener
-            }
-            val newToken = task.result
-            Log.d("FCM_TOKEN", "Token fetched successfully")
-
-            if (newToken != null) {
-                MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
-                val ref = FirebaseDatabase.getInstance().getReference("/users/$stripEmail/newToken")
-                ref.setValue(newToken)
-                    .addOnSuccessListener {
-                        Log.d(tag, "Successfully saved Token to Firebase Database")
-                    }
-                    .addOnFailureListener {
-                        Log.d(tag, "Failed to save token to database: ${it.message}")
-                    }
-
+                Toast.makeText(this@LoginActivity, "Failed to get token: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
