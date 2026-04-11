@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.tictacfirebase.model.User
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
+import com.example.tictacfirebase.utils.ValidationUtils
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessaging
@@ -105,10 +106,26 @@ class registerActivity : AppCompatActivity() {
     private fun performRegister() {
         val email = email_edittext_register.text.toString().trim()
         val password = password_edittext_register.text.toString().trim()
+        val username = username_edittext_register.text.toString().trim()
 
-        if (email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Please enter text in email/pw", Toast.LENGTH_SHORT).show()
+        // Валидация email
+        if (!ValidationUtils.isValidEmail(email)) {
             hideLoading()
+            Toast.makeText(this, ValidationUtils.getEmailErrorMessage(email), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Валидация пароля
+        if (!ValidationUtils.isValidPassword(password)) {
+            hideLoading()
+            Toast.makeText(this, ValidationUtils.getPasswordErrorMessage(password), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Валидация username
+        if (!ValidationUtils.isValidUsername(username)) {
+            hideLoading()
+            Toast.makeText(this, ValidationUtils.getUsernameErrorMessage(username), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -175,8 +192,11 @@ class registerActivity : AppCompatActivity() {
 //        refreshTokens()
         val newTokens = refreshTokens().toString()
 
+        // Санитизация username перед сохранением
+        val rawUsername = username_edittext_register.text.toString().trim()
+        val sanitizedUsername = ValidationUtils.sanitizeInput(rawUsername)
 
-        val user = User(uid, Request, username_edittext_register.text.toString(), profileImageUrl, newTokens)
+        val user = User(uid, Request, sanitizedUsername, profileImageUrl, newTokens)
 
         ref.setValue(user)
                 .addOnSuccessListener {
@@ -184,9 +204,7 @@ class registerActivity : AppCompatActivity() {
 
                     val intent = Intent(this, MainActivity::class.java)
                     intent.putExtra("email", email.toString().trim())
-                    Log.d(tag, "putExtraEmail: $email")
                     intent.putExtra("uid", uid)
-                    Log.d(tag, "putExtraUid: ${uid}")
                     intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK.or(Intent.FLAG_ACTIVITY_NEW_TASK)
 //                refreshTokens()
                     hideLoading()
