@@ -22,6 +22,12 @@ class Notifications {
         val intent = Intent(context, LoginActivity::class.java)
         val channelId = CHANNELSTRING
 
+        val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
         val builder = NotificationCompat.Builder(context)
             .setDefaults(Notification.DEFAULT_ALL)
             .setContentTitle("New request")
@@ -30,7 +36,7 @@ class Notifications {
             .setSmallIcon(R.drawable.ic_fire_emoji)
             .setContentIntent(
                 PendingIntent.getActivity(
-                    context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT
+                    context, 0, intent, pendingIntentFlags
                 )
             )
             .setAutoCancel(true)
