@@ -12,6 +12,7 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.tictacfirebase.model.User
 import com.example.tictacfirebase.service.MyFirebaseMessagingService
 import com.google.firebase.auth.FirebaseAuth
@@ -20,8 +21,9 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.FirebaseStorage
 import de.hdodenhof.circleimageview.CircleImageView
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.*
 
 class registerActivity : AppCompatActivity() {
@@ -144,27 +146,21 @@ class registerActivity : AppCompatActivity() {
 
         val filename = UUID.randomUUID().toString()
         val ref = FirebaseStorage.getInstance().getReference("/images/$filename")
-        GlobalScope.launch(Dispatchers.IO) {
-            ref.putFile(selectedPhotoUri!!)
-                    .addOnSuccessListener {
-                        Log.d(tag, "Successfully uploaded image: ${it.metadata?.path}")
+        
+        lifecycleScope.launch {
+            try {
+                val uploadTask = ref.putFile(selectedPhotoUri!!).await()
+                Log.d(tag, "Successfully uploaded image: ${uploadTask.metadata?.path}")
 
-                        ref.downloadUrl.addOnSuccessListener {
-                            Log.d(tag, "File Location: $it")
+                val downloadUrl = ref.downloadUrl.await()
+                Log.d(tag, "File Location: $downloadUrl")
 
-                            saveUserToFirebaseDatabase(it.toString())
-                        }
-                                .addOnFailureListener {
-                                    hideLoading()
-                                    Log.d(tag, "Failed to get download url: ${it.message}")
-                                    Toast.makeText(this@registerActivity, "Failed to get image URL", Toast.LENGTH_SHORT).show()
-                                }
-                    }
-                    .addOnFailureListener {
-                        hideLoading()
-                        Log.d(tag, "Failed to upload image to storage: ${it.message}")
-                        Toast.makeText(this@registerActivity, "Failed to upload image", Toast.LENGTH_SHORT).show()
-                    }
+                saveUserToFirebaseDatabase(downloadUrl.toString())
+            } catch (e: Exception) {
+                hideLoading()
+                Log.d(tag, "Failed to upload image or get URL: ${e.message}")
+                Toast.makeText(this@registerActivity, "Failed to process image: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -223,22 +219,25 @@ class registerActivity : AppCompatActivity() {
     }
 
     private fun refreshTokens(): String? {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w(tag, "Fetching FCM registration token failed", task.exception)
-                hideLoading()
-                return@addOnCompleteListener
-            }
-            val newToken = task.result
-            Log.d("FCM_TOKEN", "Token fetched successfully")
-
-            if (newToken != null) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    MyFirebaseMessagingService().saveTokenToFirebaseDatabase(newToken)
+        var newToken: String? = null
+        
+        lifecycleScope.launch {
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                Log.d("FCM_TOKEN", "Token fetched successfully: $token")
+                
+                if (token != null) {
+                    withContext(Dispatchers.IO) {
+                        MyFirebaseMessagingService().saveTokenToFirebaseDatabase(token)
+                    }
+                    newToken = token
                 }
+            } catch (e: Exception) {
+                Log.w(tag, "Fetching FCM registration token failed", e)
+                // Не скрываем loading здесь, т.к. это вспомогательная функция
             }
         }
-        return null
+        return newToken
     }
 
 
