@@ -2,10 +2,14 @@ package com.example.tictacfirebase.repository
 
 import android.util.Log
 import com.example.tictacfirebase.utils.Result
+import com.example.tictacfirebase.utils.asCanonicalPlayer
 import com.example.tictacfirebase.utils.runCatchingResult
+import com.example.tictacfirebase.utils.samePlayer
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.MutablePostData
+import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -34,10 +38,15 @@ class GameRepository {
      * Отправка запроса на игру другому пользователю
      * ПРОВЕРЯЕТ: нет ли уже активного приглашения от этого пользователя
      */
-    suspend fun sendGameRequest(fromUser: String, toUser: String): Result<Unit> {
+    suspend fun sendGameRequest(fromUserRaw: String, toUserRaw: String): Result<Unit> {
         return runCatchingResult {
-            val splitToUser = toUser.substringBefore("@")
-            val splitFromUser = fromUser.substringBefore("@")
+            // КАНОН ИДЕНТИФИКАТОРОВ: email приводим к нижнему регистру/trim ОДИН раз здесь,
+            // дальше по коду используем только канонические значения.
+            // users/* адресуется логином (substringBefore("@").asCanonicalPlayer()), а клетки и currentTurn — полным email.
+            val fromUser = fromUserRaw.asCanonicalPlayer()
+            val toUser = toUserRaw.asCanonicalPlayer()
+            val splitToUser = toUser.substringBefore("@").asCanonicalPlayer()
+            val splitFromUser = fromUser.substringBefore("@").asCanonicalPlayer()
             
             // Проверяем существование пользователя и получаем его токен
             val tokenSnapshot = myRef.child("users").child(splitToUser).child("newToken").get().await()
@@ -79,6 +88,10 @@ class GameRepository {
                 throw Exception("$toUser уже пригласил вас. Примите их приглашение вместо отправки нового.")
             }
             
+            if (samePlayer(fromUser, toUser)) {
+                throw Exception("Нельзя пригласить самого себя")
+            }
+
             Log.d("GameRepository", "Found token for user $splitToUser, sending game request")
             
             // Сохраняем запрос в БД
@@ -201,7 +214,7 @@ class GameRepository {
      * Наблюдение за входящими запросами на игру (возвращает email отправителя)
      */
     fun observeGameRequests(userEmail: String): Flow<String> = callbackFlow {
-        val splitEmail = userEmail.substringBefore("@")
+        val splitEmail = userEmail.substringBefore("@").asCanonicalPlayer()
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
@@ -235,7 +248,7 @@ class GameRepository {
      */
     suspend fun clearGameRequest(userEmail: String): Result<Unit> {
         return runCatchingResult {
-            val splitEmail = userEmail.substringBefore("@")
+            val splitEmail = userEmail.substringBefore("@").asCanonicalPlayer()
             myRef.child("users").child(splitEmail).child("request").removeValue().await()
         }
     }
@@ -244,7 +257,7 @@ class GameRepository {
      * Прослушивание входящих запросов на игру
      */
     fun observeIncomingRequests(userEmail: String): Flow<List<String>> = callbackFlow {
-        val splitEmail = userEmail.substringBefore("@")
+        val splitEmail = userEmail.substringBefore("@").asCanonicalPlayer()
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
@@ -276,7 +289,7 @@ class GameRepository {
      */
     suspend fun getUserProfileImage(email: String): Result<String?> {
         return runCatchingResult {
-            val splitEmail = email.substringBefore("@")
+            val splitEmail = email.substringBefore("@").asCanonicalPlayer()
             val snapshot = myRef.child("users").child(splitEmail).child("profileImageUrl").get().await()
             snapshot.value as? String
         }
@@ -288,7 +301,7 @@ class GameRepository {
      */
     suspend fun clearUserRequests(userEmail: String): Result<Unit> {
         return runCatchingResult {
-            val splitEmail = userEmail.substringBefore("@")
+            val splitEmail = userEmail.substringBefore("@").asCanonicalPlayer()
             myRef.child("users").child(splitEmail).child("request").removeValue().await()
         }
     }
@@ -336,15 +349,20 @@ class GameRepository {
                             continue
                         }
                         
-                        // ПРОСТАЯ ЛОГИКА: сравниваем email в клетке с firstPlayer
-                        // Если email == firstPlayer → это X
-                        // Если email != firstPlayer → это O
-                        val symbol = if (cellValue == firstPlayer) {
-                            "X"
-                        } else {
-                            "O"
+                        // Сравниваем email в клетке с игроками в ЕДИНОМ каноне (trim+lowercase).
+                        // Если email == firstPlayer → это X, иначе если совпадает со вторым игроком → O.
+                        // ВАЖНО: раньше любое несовпадение трактовалось как "O", из-за чего
+                        // ходы одного игрока перекрашивались и выглядели как захват всего поля.
+                        val secondPlayer = if (samePlayer(firstPlayer, player1)) player2 else player1
+                        val symbol = when {
+                            samePlayer(cellValue, firstPlayer) -> "X"
+                            samePlayer(cellValue, secondPlayer) -> "O"
+                            else -> {
+                                Log.w("GameRepository", "observeBoardState: cell $i value '$cellValue' matches neither player, ignoring")
+                                null
+                            }
                         }
-                        
+
                         board[i - 1] = symbol
                         Log.d(
                             "GameRepository",
@@ -430,24 +448,36 @@ class GameRepository {
      */
     suspend fun restartGame(sessionID: String): Result<Unit> {
         return runCatchingResult {
-            // Получаем текущих игроков перед очисткой
-            val player1Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
-            val player2Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
-            val firstPlayerSnapshot = myRef.child("PlayerOnline").child(sessionID).child("firstPlayer").get().await()
-            
-            val player1 = player1Snapshot.value as? String ?: ""
-            val player2 = player2Snapshot.value as? String ?: ""
-            val firstPlayer = firstPlayerSnapshot.value as? String ?: player1
-            
-            // Очищаем только ходы (клетки 1-9), но сохраняем информацию об игроках
-            for (i in 1..9) {
-                myRef.child("PlayerOnline").child(sessionID).child(i.toString()).removeValue().await()
+            val sessionRef = myRef.child("PlayerOnline").child(sessionID)
+
+            val playersSnapshot = sessionRef.get().await()
+            val player1 = (playersSnapshot.child("player1").value as? String ?: "").asCanonicalPlayer()
+            val player2 = (playersSnapshot.child("player2").value as? String ?: "").asCanonicalPlayer()
+            val firstPlayerRaw = playersSnapshot.child("firstPlayer").value as? String
+            val firstPlayer = (if (firstPlayerRaw.isNullOrBlank()) player1 else firstPlayerRaw).asCanonicalPlayer()
+
+            if (player1.isEmpty() || player2.isEmpty()) {
+                throw Exception("Сессия не инициализирована: нет данных об игроках")
             }
-            
-            // Восстанавливаем currentTurn - ход переходит к первому игроку
-            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(firstPlayer).await()
-            
-            Log.d("GameRepository", "Game restarted: player1=$player1, player2=$player2, firstPlayer=$firstPlayer, currentTurn=$firstPlayer")
+
+            // АТОМАРНЫЙ перезапуск: раньше клетки очищались девятью последовательными
+            // removeValue(), и между ними любой из клиентов мог записать ход в уже
+            // очищенную клетку. updateChildren выполняет все записи одной
+            // операцией на сервере. Ключи клеток в БД — "1".."9" (1-based), как и в makeMove().
+            val updates = mutableMapOf<String, Any>(
+                "currentTurn" to firstPlayer,
+                "firstPlayer" to firstPlayer,
+                "player1" to player1,
+                "player2" to player2,
+                "initialized" to true
+            )
+            for (i in 1..9) {
+                updates[i.toString()] = ""
+            }
+
+            sessionRef.updateChildren(updates).await()
+
+            Log.d("GameRepository", "Game restarted atomically: player1=$player1, player2=$player2, firstPlayer=$firstPlayer, currentTurn=$firstPlayer")
         }
     }
     
@@ -458,8 +488,20 @@ class GameRepository {
      * @param player1 Email первого игрока (отправитель запроса, всегда X)
      * @param player2 Email второго игрока (принявший запрос, всегда O)
      */
-    suspend fun setupGameSession(sessionID: String, player1: String, player2: String): Result<Unit> {
+    suspend fun setupGameSession(sessionID: String, player1Raw: String, player2Raw: String): Result<Unit> {
         return runCatchingResult {
+            // КАНОН ИДЕНТИФИКАТОРОВ: значения, которые пишутся в currentTurn/firstPlayer/
+            // player1/player2 и позже сравниваются со значениями клеток, приводим к одному канону.
+            val player1 = player1Raw.asCanonicalPlayer()
+            val player2 = player2Raw.asCanonicalPlayer()
+
+            if (player1.isEmpty() || player2.isEmpty()) {
+                throw Exception("Некорректные данные игроков для сессии")
+            }
+            if (samePlayer(player1, player2)) {
+                throw Exception("Нельзя создать сессию против самого себя")
+            }
+
             // Используем updateChildren для атомарной установки всех полей
             // Это гарантирует что все данные будут записаны одновременно
             // ВАЖНО: player1 = отправитель запроса = firstPlayer = X
@@ -509,11 +551,57 @@ class GameRepository {
     }
     
     /**
-     * Совершение хода в игре
-     * @param sessionID Уникальный идентификатор сессии
-     * @param cellId Индекс клетки (1-9) - как хранится в БД
-     * @param playerEmail Email игрока
-     * @param symbol Символ игрока (X или O)
+     * Проверка, что партия в узле сессии уже завершена (кто-то выиграл или ничья).
+     * Используется внутри транзакции хода, чтобы после победы нельзя было
+     * «дотыкать» оставшиеся клетки.
+     *
+     * Клетки в БД — 1-based ключи "1".."9"; здесь они мапятся в список индексов ходов,
+     * а победные комбинации заданы в той же 1-based нумерации (как в GameManager и AppConstants.CellIds).
+     */
+    private fun isFinished(node: MutablePostData, player1: String, player2: String): Boolean {
+        val winningCombinations = listOf(
+            listOf(1, 2, 3), listOf(4, 5, 6), listOf(7, 8, 9), // ряды
+            listOf(1, 4, 7), listOf(2, 5, 8), listOf(3, 6, 9), // колонки
+            listOf(1, 5, 9), listOf(3, 5, 7)                    // диагонали
+        )
+
+        val p1Moves = mutableListOf<Int>()
+        val p2Moves = mutableListOf<Int>()
+        var totalMoves = 0
+
+        for (i in 1..9) {
+            val owner = (node.child(i.toString()).getValue(String::class.java) ?: "").asCanonicalPlayer()
+            if (owner.isEmpty()) continue
+            totalMoves++
+            when {
+                samePlayer(owner, player1) -> p1Moves.add(i)
+                samePlayer(owner, player2) -> p2Moves.add(i)
+                else -> {
+                    // Клетка принадлежит неизвестному игроку — данные повреждены,
+                    // сочтём партию завершённой, чтобы не давали делать новые ходы.
+                    Log.w("GameRepository", "isFinished: cell $i owned by unknown player '$owner'")
+                    return true
+                }
+            }
+        }
+
+        val finished = winningCombinations.any { p1Moves.containsAll(it) } ||
+                winningCombinations.any { p2Moves.containsAll(it) } ||
+                totalMoves >= 9
+
+        if (finished) {
+            Log.d("GameRepository", "isFinished: game already over (p1=$p1Moves, p2=$p2Moves)")
+        }
+        return finished
+    }
+
+    /**
+     * Совершение хода в игре (атомарно через Firebase Transaction)
+     * @param sessionID Уникальный идентификатор сессии (комнаты)
+     * @param cellId Номер клетки 1-9 — именно под такими ключами ходы хранятся в БД
+     *        (в UI/ViewModel доска — 0-based массив boardState[0..8], конверсия выполняется в ViewModel)
+     * @param playerEmail Email игрока, заявляющего ход
+     * @param symbol Символ игрока (X или O) — используется только для логов
      */
     suspend fun makeMove(sessionID: String, cellId: Int, playerEmail: String, symbol: String): Result<Unit> {
         return runCatchingResult {
@@ -523,42 +611,80 @@ class GameRepository {
                 "SessionID: $sessionID, CellId: $cellId, Player: $playerEmail, Symbol: $symbol"
             )
 
-            // Проверяем текущий ход ПЕРЕД записью
-            val currentTurnSnapshot = myRef.child("PlayerOnline").child(sessionID).child("currentTurn").get().await()
-            val currentPlayer = currentTurnSnapshot.value as? String ?: ""
-            Log.d("GameRepository", "Current turn before move: $currentPlayer")
-
-            if (currentPlayer != playerEmail) {
-                Log.w(
-                    "GameRepository",
-                    "Attempted move by $playerEmail but it's $currentPlayer's turn!"
-                )
-                throw Exception("Сейчас не ваш ход! Ожидается ход от $currentPlayer")
-            }
-            
-            // Проверяем, не занята ли клетка
-            val cellSnapshot = myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).get().await()
-            val cellValue = cellSnapshot.value as? String
-            if (!cellValue.isNullOrBlank()) {
-                Log.w("GameRepository", "Cell $cellId is already occupied by $cellValue")
-                throw Exception("Клетка уже занята!")
+            if (cellId !in 1..9) {
+                throw Exception("Неверный номер клетки: $cellId (допустимы 1-9)")
             }
 
-            // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
-            // observeBoardState затем преобразует email в символ (X/O) на основе player1/player2
-            myRef.child("PlayerOnline").child(sessionID).child(cellId.toString()).setValue(playerEmail).await()
-            
-            // Переключаем текущий ход на следующего игрока
-            val player1Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player1").get().await()
-            val player1 = player1Snapshot.value as? String ?: ""
-            
-            val player2Snapshot = myRef.child("PlayerOnline").child(sessionID).child("player2").get().await()
-            val player2 = player2Snapshot.value as? String ?: ""
-            
-            val nextPlayer = if (currentPlayer == player1) player2 else player1
-            
-            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
-            Log.d("GameRepository", "Move made at cell $cellId by $playerEmail ($symbol), switched turn from $currentPlayer to $nextPlayer")
+            // АТОМАРНАЯ ОПЕРАЦИЯ: проверка чьего хода, проверка занятости клетки,
+            // запись хода и переключение хода выполняются в одной транзакции Firebase.
+            // Раньше это были отдельные get()/setValue(), между которыми второй клик
+            // того же игрока успевал пройти все проверки ("check-then-act" гонка) —
+            // именно поэтому один игрок мог занять несколько (и все) клеток подряд.
+            //
+            // НЕЙМИНГ КЛЕТОК: в БД клетки хранятся под ключами "1".."9" (1-based),
+            // а boardState во ViewModel/UI — 0-based массив [0..8]. Конверсия
+            // выполняется в GameViewModel.makeMove(); сюда приходит уже 1-based cellId.
+            val sessionRef = myRef.child("PlayerOnline").child(sessionID)
+            val result = sessionRef.runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutablePostData): Transaction.Result {
+                    val node = currentData.value ?: return Transaction.abort()
+
+                    val currentTurn = (node.child("currentTurn").getValue(String::class.java) ?: "").asCanonicalPlayer()
+                    val player1 = (node.child("player1").getValue(String::class.java) ?: "").asCanonicalPlayer()
+                    val player2 = (node.child("player2").getValue(String::class.java) ?: "").asCanonicalPlayer()
+                    val actor = playerEmail.asCanonicalPlayer()
+
+                    if (player1.isEmpty() || player2.isEmpty()) {
+                        Log.w("GameRepository", "Transaction aborted: session not initialized")
+                        return Transaction.abort()
+                    }
+
+                    // Заявитель хода должен быть одним из игроков этой сессии
+                    if (!samePlayer(actor, player1) && !samePlayer(actor, player2)) {
+                        Log.w("GameRepository", "Transaction aborted: $actor is not a player of this session")
+                        return Transaction.abort()
+                    }
+
+                    // Ход может сделать только тот, чей сейчас ход
+                    if (!samePlayer(currentTurn, actor)) {
+                        Log.w("GameRepository", "Attempted move by $actor but it's $currentTurn's turn!")
+                        return Transaction.abort()
+                    }
+
+                    val cellValue = (node.child(cellId.toString()).getValue(String::class.java) ?: "").asCanonicalPlayer()
+                    if (cellValue.isNotEmpty()) {
+                        Log.w("GameRepository", "Cell $cellId is already occupied by $cellValue")
+                        return Transaction.abort()
+                    }
+
+                    // Игра ещё не окончена (защита от «дотыкивания» поля после победы)
+                    if (isFinished(node, player1, player2)) {
+                        Log.w("GameRepository", "Transaction aborted: game already finished")
+                        return Transaction.abort()
+                    }
+
+                    // В клетку пишем email владельца хода (ключи клеток в БД — "1".."9")
+                    node.child(cellId.toString()).value = currentTurn
+
+                    // Переключаем ход на соперника
+                    val nextPlayer = if (samePlayer(currentTurn, player1)) player2 else player1
+                    node.child("currentTurn").value = nextPlayer
+
+                    return Transaction.success(node)
+                }
+
+                override fun onComplete(error: DatabaseError?, committed: Boolean, data: DataSnapshot?) {
+                    if (error != null) {
+                        Log.e("GameRepository", "Move transaction failed: ${error.message}")
+                    }
+                }
+            }).await()
+
+            if (!result.committed) {
+                throw Exception("Ход отклонён: сейчас не ваш ход или клетка уже занята")
+            }
+
+            Log.d("GameRepository", "Move committed atomically: cell $cellId by $playerEmail ($symbol)")
         }
     }
     
@@ -566,23 +692,16 @@ class GameRepository {
      * Обновление состояния доски (устаревший метод, используется makeMove)
      * После обновления автоматически переключает currentTurn на следующего игрока
      */
+    @Deprecated(
+        "Небезопасен: переключает currentTurn без проверки авторства хода. Используйте makeMove().",
+        ReplaceWith("makeMove(sessionID, cellId, playerEmail, symbol)")
+    )
     suspend fun updateBoardState(sessionID: String, board: List<String>): Result<Unit> {
         return runCatchingResult {
-            // Получаем текущего игрока из локальных данных (передается из ViewModel)
-            // Этот метод оставлен для обратной совместимости, но лучше использовать makeMove
-            val currentTurnResult = getCurrentTurn(sessionID)
-            val currentPlayer = if (currentTurnResult is Result.Success) currentTurnResult.data else ""
-            
-            val player1Result = getPlayer1(sessionID)
-            val player1 = if (player1Result is Result.Success) player1Result.data else ""
-            
-            val player2Result = getPlayer2(sessionID)
-            val player2 = if (player2Result is Result.Success) player2Result.data else ""
-            
-            val nextPlayer = if (currentPlayer == player1) player2 else player1
-            
-            myRef.child("PlayerOnline").child(sessionID).child("currentTurn").setValue(nextPlayer).await()
-            Log.d("GameRepository", "Board state updated, switched turn from $currentPlayer to $nextPlayer")
+            // Метод сохранён только для обратной совместимости и намеренно отключён.
+            // Он переключал currentTurn без проверки, чей ход, что позволяло одному
+            // клиенту «передавать» ход самому себе и занимать все клетки подряд.
+            throw UnsupportedOperationException("updateBoardState отключён: используйте makeMove()")
         }
     }
     

@@ -5,22 +5,89 @@
     "users": {
       "$userId": {
         ".read": "auth != null",
-        ".write": "$userId === auth.uid || root.child('users').child($userId).child('email').val() === auth.token.email",
+        ".write": "$userId === auth.uid.replace(/@/g, '').split('.')[0] || root.child('users').child($userId).child('email').val() === auth.token.email",
         "request": {
-          ".read": "$userId === auth.uid.replace(/@/g, '').split('.')[0] || root.child('users').child($userId).child('email').val() === auth.token.email",
+          ".read": "auth != null",
           ".write": "auth != null"
         }
       }
     },
     "PlayerOnline": {
       ".read": "auth != null",
-      ".write": "auth != null",
       "$sessionId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+        "//": "СЕРВЕРНАЯ ЗАЩИТА от бага «один игрок может натыкать все клетки». НЕЙМИНГ КЛЕТОК: в БД клетки — ключи \"1\"..\"9\" (1-based); во ViewModel/UI доска — 0-based массив [0..8]; конверсия только в GameViewModel.makeMove(). Идентификаторы — канон trim+lowercase (utils/PlayerId.kt), email токена тоже строчный. Разрешены ровно два вида записей: A) СОЗДАНИЕ сессии — заявка, где player1/player2 содержит наш email; B) ХОД/РЕСТАРТ — поля игроков неизменны, писать можно в свой ход (или при пустой доске — рестарт), а значение каждой непустой клетки обязано быть email одного из игроков. Отдельные правки currentTurn/клеток запрещены узловыми .write=false (правила проверяются по всему пути до узла), поэтому точечно «передать ход себе» нельзя. Ограничение: win-state правилами RTDB не проверяется — защита от ходов после победы остаётся в транзакции клиента (GameRepository.isFinished); полная гарантия потребовала бы Cloud Functions.",
+        ".write": "auth!=null&&(data.exists()?(newData.hasChildren()&&newData.child('player1').val()===data.child('player1').val()&&newData.child('player2').val()===data.child('player2').val()&&(data.child('currentTurn').val()===auth.token.email||!(((newData.child('1').val()!==''&&newData.child('1').val()!==null)||(newData.child('2').val()!==''&&newData.child('2').val()!==null)||(newData.child('3').val()!==''&&newData.child('3').val()!==null)||(newData.child('4').val()!==''&&newData.child('4').val()!==null)||(newData.child('5').val()!==''&&newData.child('5').val()!==null)||(newData.child('6').val()!==''&&newData.child('6').val()!==null)||(newData.child('7').val()!==''&&newData.child('7').val()!==null)||(newData.child('8').val()!==''&&newData.child('8').val()!==null)||(newData.child('9').val()!==''&&newData.child('9').val()!==null))))&&(newData.child('1').val()===''||newData.child('1').val()===data.child('player1').val()||newData.child('1').val()===data.child('player2').val())&&(newData.child('2').val()===''||newData.child('2').val()===data.child('player1').val()||newData.child('2').val()===data.child('player2').val())&&(newData.child('3').val()===''||newData.child('3').val()===data.child('player1').val()||newData.child('3').val()===data.child('player2').val())&&(newData.child('4').val()===''||newData.child('4').val()===data.child('player1').val()||newData.child('4').val()===data.child('player2').val())&&(newData.child('5').val()===''||newData.child('5').val()===data.child('player1').val()||newData.child('5').val()===data.child('player2').val())&&(newData.child('6').val()===''||newData.child('6').val()===data.child('player1').val()||newData.child('6').val()===data.child('player2').val())&&(newData.child('7').val()===''||newData.child('7').val()===data.child('player1').val()||newData.child('7').val()===data.child('player2').val())&&(newData.child('8').val()===''||newData.child('8').val()===data.child('player1').val()||newData.child('8').val()===data.child('player2').val())&&(newData.child('9').val()===''||newData.child('9').val()===data.child('player1').val()||newData.child('9').val()===data.child('player2').val())):(newData.child('player1').val()===auth.token.email||newData.child('player2').val()===auth.token.email)))",
+        "currentTurn": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "firstPlayer": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "player1": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "player2": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "initialized": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "sessionCreated": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "opponentLeft": {
+          ".write": "root.child('PlayerOnline').child($sessionId).child('player1').val()===auth.token.email||root.child('PlayerOnline').child($sessionId).child('player2').val()===auth.token.email",
+          ".read": "auth != null"
+        },
+        "1": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "2": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "3": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "4": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "5": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "6": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "7": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "8": {
+          ".write": false,
+          ".read": "auth != null"
+        },
+        "9": {
+          ".write": false,
+          ".read": "auth != null"
+        }
       }
     },
     "latest-messages": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "fcm_queue": {
       ".read": "auth != null",
       ".write": "auth != null"
     }
