@@ -12,7 +12,9 @@ import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import kotlin.coroutines.resume
 
 /**
  * Repository для работы с Firebase Realtime Database
@@ -532,57 +534,71 @@ class GameRepository {
             // и будет отклонён. Раньше между get() и setValue() был сетевой зазор,
             // позволявший "пробить" несколько клеток за один ход.
             val sessionRef = myRef.child("PlayerOnline").child(sessionID)
-            val result = sessionRef.runTransaction(object : Transaction.Handler {
-                override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    val currentPlayer = currentData.child("currentTurn").getValue<String>() ?: ""
 
-                    if (currentPlayer != playerEmail) {
-                        Log.w(
-                            "GameRepository",
-                            "Attempted move by $playerEmail but it's $currentPlayer's turn!"
-                        )
-                        // Откатываем транзакцию - ход не засчитывается
-                        return Transaction.abort()
+            // Исход транзакции: "ok" | "not_your_turn" | "cell_occupied".
+            // Записывается из doTransaction (вызывается в том же стеке, видимость гарантирована).
+            var outcome = "not_your_turn"
+
+            // runTransaction возвращает Task<Transaction.Result>, к которому нельзя применить
+            // kotlinx.coroutines.tasks.await() — забираем результат через колбэк onComplete.
+            suspendCancellableCoroutine<Unit> { cont ->
+                sessionRef.runTransaction(object : Transaction.Handler {
+                    override fun doTransaction(currentData: MutableData): Transaction.Result {
+                        // Поле .value у MutableData имеет тип Object? — безопасно приводим к String
+                        val currentPlayer = currentData.child("currentTurn").value as? String ?: ""
+
+                        if (currentPlayer != playerEmail) {
+                            Log.w(
+                                "GameRepository",
+                                "Attempted move by $playerEmail but it's $currentPlayer's turn!"
+                            )
+                            outcome = "not_your_turn"
+                            // Откатываем транзакцию - ход не засчитывается
+                            return Transaction.abort()
+                        }
+
+                        val cellValue = currentData.child(cellId.toString()).value as? String
+                        if (!cellValue.isNullOrEmpty()) {
+                            Log.w("GameRepository", "Cell $cellId is already occupied by $cellValue")
+                            outcome = "cell_occupied"
+                            // Откатываем транзакцию - клетка занята
+                            return Transaction.abort()
+                        }
+
+                        val player1 = currentData.child("player1").value as? String ?: ""
+                        val player2 = currentData.child("player2").value as? String ?: ""
+                        val nextPlayer = if (currentPlayer == player1) player2 else player1
+
+                        // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
+                        // observeBoardState затем преобразует email в символ (X/O) на основе firstPlayer
+                        currentData.child(cellId.toString()).value = playerEmail
+                        currentData.child("currentTurn").value = nextPlayer
+
+                        Log.d("GameRepository", "Transaction: move at cell $cellId by $playerEmail ($symbol), switching turn from $currentPlayer to $nextPlayer")
+                        outcome = "ok"
+                        return Transaction.success(currentData)
                     }
 
-                    val cellValue = currentData.child(cellId.toString()).getValue<String>()
-                    if (!cellValue.isNullOrBlank()) {
-                        Log.w("GameRepository", "Cell $cellId is already occupied by $cellValue")
-                        // Откатываем транзакцию - клетка занята
-                        return Transaction.abort()
+                    override fun onComplete(error: DatabaseError?, committed: Boolean, currentValue: DataSnapshot?) {
+                        if (error != null || !committed) {
+                            Log.w("GameRepository", "makeMove transaction aborted/failed: ${error?.message}, committed=$committed")
+                        }
+                        if (cont.isActive) {
+                            if (error != null) {
+                                cont.resumeWith(Result.failure(Exception(error.message)))
+                            } else {
+                                cont.resume(Unit)
+                            }
+                        }
                     }
-
-                    val player1 = currentData.child("player1").getValue<String>() ?: ""
-                    val player2 = currentData.child("player2").getValue<String>() ?: ""
-                    val nextPlayer = if (currentPlayer == player1) player2 else player1
-
-                    // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
-                    // observeBoardState затем преобразует email в символ (X/O) на основе firstPlayer
-                    currentData.child(cellId.toString()).value = playerEmail
-                    currentData.child("currentTurn").value = nextPlayer
-
-                    Log.d("GameRepository", "Transaction: move at cell $cellId by $playerEmail ($symbol), switching turn from $currentPlayer to $nextPlayer")
-                    return Transaction.success(currentData)
-                }
-
-                override fun onComplete(error: DatabaseError?, committed: Boolean, currentValue: DataSnapshot?) {
-                    if (error != null || !committed) {
-                        Log.w("GameRepository", "makeMove transaction aborted/failed: ${error?.message}, committed=$committed")
-                    }
-                }
-            }).await()
-
-            if (!result.committed) {
-                // Транзакция была прервана (не ваш ход или клетка занята)
-                val cellAfterAbort = result.currentData?.child(cellId.toString())?.getValue(String::class.java)
-                if (!cellAfterAbort.isNullOrBlank()) {
-                    throw Exception("Клетка уже занята!")
-                } else {
-                    throw Exception("Сейчас не ваш ход!")
-                }
+                })
             }
 
-            Log.d("GameRepository", "Move committed successfully: cell $cellId by $playerEmail ($symbol)")
+            when (outcome) {
+                "cell_occupied" -> throw Exception("Клетка уже занята!")
+                "ok" -> Log.d("GameRepository", "Move committed successfully: cell $cellId by $playerEmail ($symbol)")
+                else -> throw Exception("Сейчас не ваш ход!")
+            }
         }
     }
     
