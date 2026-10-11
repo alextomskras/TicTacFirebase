@@ -585,7 +585,10 @@ class GameRepository {
                         }
                         if (cont.isActive) {
                             if (error != null) {
-                                cont.resumeWith(Result.failure(Exception(error.message)))
+                                // Result здесь резолвится типом Unit, поэтому Kotlin не подставляет
+                                // обобщённый параметр у Result.failure(...) — указываем явно,
+                                // иначе ошибка компиляции "Unresolved reference 'failure'".
+                                cont.resumeWith(kotlin.Result.failure<Unit>(Exception(error.message)))
                             } else {
                                 cont.resume(Unit)
                             }
