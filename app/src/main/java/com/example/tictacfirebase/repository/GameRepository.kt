@@ -122,11 +122,18 @@ class GameRepository {
                     // Сигнатура ровно как в работающей транзакции makeMove() ниже:
                     // третий параметр — DataSnapshot?, а НЕ MutableData? (иначе
                     // "onComplete overrides nothing" и класс не реализует абстрактный метод).
+                    // ВАЖНО: если сервер отклонил запись по правилам БД (PERMISSION_DENIED),
+                    // приходит error!=null при committed=false — обязательно пробрасываем её в UI,
+                    // иначе получаем молчаливый «пригласили, но у соседа ничего не появилось».
                     override fun onComplete(error: DatabaseError?, committed: Boolean, currentValue: DataSnapshot?) {
                         if (error != null) {
-                            txError = Exception("Не удалось отправить приглашение: ${error.message}")
+                            txError = Exception("Не удалось отправить приглашение: ${error.code} ${error.message}")
+                            newRequestId = null
+                        } else if (!committed) {
+                            // abort (дубль) или отказ сервера по правилам — ошибки нет, но хода нет
+                            newRequestId = null
                         }
-                        Log.d("GameRepository", "Invite transaction complete: committed=$committed, outcome=$inviteTxOutcome")
+                        Log.d("GameRepository", "Invite transaction complete: committed=$committed, error=${error?.message}, outcome=$inviteTxOutcome")
                         if (cont.isActive) cont.resume(Unit)
                     }
                 })
