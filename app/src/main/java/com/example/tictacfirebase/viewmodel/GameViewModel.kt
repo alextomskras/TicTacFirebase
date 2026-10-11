@@ -36,6 +36,10 @@ class GameViewModel(
     private val _uiEffect = MutableSharedFlow<UiEffect>()
     val uiEffect: SharedFlow<UiEffect> = _uiEffect.asSharedFlow()
 
+    // Флаг защиты от "двойного тапа": пока ход отправляется на сервер,
+    // все новые клики по клеткам игнорируются.
+    private var isMoveInProgress = false
+
     private val gameManager = GameManager()
     
     // Идентификатор текущей игры - может быть обновлен при создании/присоединении к новой игре
@@ -544,6 +548,14 @@ class GameViewModel(
 
     fun makeMove(cellIndexFromUi: Int) {
         viewModelScope.launch {
+            // Защита от быстрых повторных нажатий: не принимаем новый клик,
+            // пока предыдущий ход ещё обрабатывается
+            if (isMoveInProgress) {
+                Log.d("GameViewModel", "makeMove ignored: move already in progress")
+                return@launch
+            }
+            isMoveInProgress = true
+            try {
             // Преобразуем индекс из UI (1-9) в индекс массива (0-8)
             val cellIndex = cellIndexFromUi - 1
             
@@ -591,6 +603,9 @@ class GameViewModel(
                 sendEffect(UiEffect.ShowToast("Ошибка хода: $errorMessage"))
             }
             // В случае успеха ничего не делаем - состояние обновится через observeBoardState и observeCurrentTurn
+            } finally {
+                isMoveInProgress = false
+            }
         }
     }
 
