@@ -34,9 +34,15 @@ object NetworkMonitor {
                 network: Network,
                 networkCapabilities: NetworkCapabilities
             ) {
-                val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                // Требовать только INTERNET, без VALIDATED: на эмуляторах и некоторых
+                // провайдерах флаг VALIDATED может никогда не появиться, из-за чего
+                // оверлей "нет интернета" не показывался.
+                val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 trySend(hasInternet)
+            }
+
+            override fun onUnavailable() {
+                trySend(false)
             }
         }
 
@@ -66,7 +72,8 @@ object NetworkMonitor {
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        // См. onCapabilitiesChanged: не требуем VALIDATED, иначе на эмуляторе
+        // оверлей "нет интернета" мог не появляться даже без сети.
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }

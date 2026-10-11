@@ -7,6 +7,12 @@
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
         <item name="actionOverflowButtonStyle">@style/CustomOverflowButton</item>
+        <!-- ВАЖНО: android:fitsSystemWindows здесь ставить нельзя — при AppCompat-теме
+             с ActionBar он переносит ВСЮ DecorView (вместе с тулбаром) вниз на высоту
+             статус-бара, из-за чего кнопки Accept/Request в первом ряду layout'а
+             оказываются ПОВЕРХ тулбара ("подъехали под верхнее меню" на Samsung).
+             Корректный отступ content-а даёт сам AppCompat (см. MainActivity.onCreate). -->
+        <item name="android:statusBarColor">?attr/colorPrimaryDark</item>
     </style>
 
     <!-- Стиль для игрового поля -->

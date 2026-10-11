@@ -11,6 +11,8 @@ object AppConstants {
     const val KEY_OPPONENT_EMAIL = "opponent_email"
     const val KEY_SESSION_ID = "session_id"
     const val KEY_PLAYER_SYMBOL = "player_symbol"
+    // Email соседа, выбранного на экране «Соседи» для приглашения на игру
+    const val KEY_INVITE_EMAIL = "invite_email"
     
     // Значения символов игроков
     const val SYMBOL_X = "X"

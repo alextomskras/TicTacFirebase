@@ -12,7 +12,9 @@ import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import kotlin.coroutines.resume
 
 /**
  * Repository для работы с Firebase Realtime Database
@@ -29,6 +31,85 @@ class GameRepository {
     suspend fun updateUserToken(userId: String, token: String): Result<Unit> {
         return runCatchingResult {
             myRef.child("users").child(userId).child("newToken").setValue(token).await()
+        }
+    }
+
+    /**
+     * Presence: отмечает пользователя «в сети» (узел presence/<username>).
+     * onDisconnect сам удалит запись при закрытии приложения/обрыве соединения.
+     */
+    fun setPresence(email: String) {
+        val username = email.substringBefore("@")
+        val presenceRef = myRef.child("presence").child(username)
+        presenceRef.onDisconnect().removeValue()
+        presenceRef.setValue(mapOf("lastSeen" to System.currentTimeMillis()))
+    }
+
+    /**
+     * Presence: снимает флаг «онлайн» (например, при выходе из аккаунта).
+     */
+    suspend fun removePresence(email: String): Result<Unit> {
+        return runCatchingResult {
+            val username = email.substringBefore("@")
+            myRef.child("presence").child(username).removeValue().await()
+        }
+    }
+
+    /**
+     * Принудительно обновляет наше presence-время (для pull-to-refresh на экране «Соседи»,
+     * чтобы наш статус точно был свежим).
+     */
+    suspend fun refreshPresenceOnce(email: String): Result<Unit> {
+        return runCatchingResult {
+            val username = email.substringBefore("@")
+            myRef.child("presence").child(username)
+                .setValue(mapOf("lastSeen" to System.currentTimeMillis())).await()
+        }
+    }
+
+    /**
+     * Список соседей: все зарегистрированные пользователи с флагом онлайн
+     * (по наличию узла presence/<username>).
+     */
+    fun observeUsers(): Flow<List<com.example.tictacfirebase.model.OnlineUser>> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    val users = mutableListOf<com.example.tictacfirebase.model.OnlineUser>()
+                    snapshot.children.forEach { userSnap ->
+                        val username = userSnap.key ?: return@forEach
+                        val email = userSnap.child("email").value as? String ?: "$username@mail.ru"
+                        val avatar = userSnap.child("profileImageUrl").value as? String
+                        users.add(
+                            com.example.tictacfirebase.model.OnlineUser(
+                                username = username,
+                                email = email,
+                                isOnline = false,
+                                profileImageUrl = avatar
+                            )
+                        )
+                    }
+                    // Отдельно читаем presence и помечаем онлайн-игроков
+                    myRef.child("presence").get().addOnSuccessListener { presSnap ->
+                        val onlineNames = presSnap.children.mapNotNull { it.key }.toSet()
+                        trySend(users.map { it.copy(isOnline = onlineNames.contains(it.username)) })
+                    }.addOnFailureListener {
+                        trySend(users)
+                    }
+                } catch (e: Exception) {
+                    println("observeUsers error: $e")
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                println("observeUsers cancelled: ${error.message}")
+            }
+        }
+
+        myRef.child("users").addValueEventListener(listener)
+
+        awaitClose {
+            myRef.child("users").removeEventListener(listener)
         }
     }
     
@@ -83,8 +164,71 @@ class GameRepository {
             
             Log.d("GameRepository", "Found token for user $splitToUser, sending game request")
             
-            // Сохраняем запрос в БД
-            myRef.child("users").child(splitToUser).child("request").push().setValue(fromUser).await()
+            // ВАЖНО: Атомарно проверяем и создаём приглашение одной транзакцией.
+            // Без этого два быстрых тапа (или два устройства) успевали создать ДВА запроса,
+            // потому что проверка "alreadyInvited" выше и запись push() — это отдельные операции.
+            // Аналогично makeMove(): suspendCancellableCoroutine + onComplete вместо await(),
+            // т.к. kotlinx await() не даёт типизированного доступа к Transaction.Result.
+            val requestNode = myRef.child("users").child(splitToUser).child("request")
+            var newRequestId: String? = null   // id созданного запроса (null = дубль, пуш не шлём)
+            var txError: Exception? = null
+            var inviteTxOutcome = "pending"    // ok / duplicate — пишется из doTransaction
+
+            suspendCancellableCoroutine<Unit> { cont ->
+                requestNode.runTransaction(object : Transaction.Handler {
+                    // doTransaction вызывается синхронно в том же стеке, что и runTransaction,
+                    // поэтому outcome-флаг читаем сразу после запуска транзакции.
+                    override fun doTransaction(currentData: MutableData): Transaction.Result {
+                        val alreadyExists = currentData.children.any { child ->
+                            (child.value as? String) == fromUser
+                        }
+                        if (alreadyExists) {
+                            // Приглашение от этого пользователя уже есть — не дублируем,
+                            // пуш в очередь не кладём.
+                            Log.d("GameRepository", "Duplicate invitation suppressed by transaction: $fromUser -> $toUser")
+                            inviteTxOutcome = "duplicate"
+                            return Transaction.abort()
+                        }
+                        val pushedKey = requestNode.push().key
+                        if (pushedKey != null) {
+                            currentData.child(pushedKey).setValue(fromUser)
+                            newRequestId = pushedKey
+                        }
+                        inviteTxOutcome = "ok"
+                        return Transaction.success(currentData)
+                    }
+
+                    // Сигнатура ровно как в работающей транзакции makeMove() ниже:
+                    // третий параметр — DataSnapshot?, а НЕ MutableData? (иначе
+                    // "onComplete overrides nothing" и класс не реализует абстрактный метод).
+                    // ВАЖНО: если сервер отклонил запись по правилам БД (PERMISSION_DENIED),
+                    // приходит error!=null при committed=false — обязательно пробрасываем её в UI,
+                    // иначе получаем молчаливый «пригласили, но у соседа ничего не появилось».
+                    override fun onComplete(error: DatabaseError?, committed: Boolean, currentValue: DataSnapshot?) {
+                        if (error != null) {
+                            txError = Exception("Не удалось отправить приглашение: ${error.code} ${error.message}")
+                            newRequestId = null
+                        } else if (!committed) {
+                            // abort (дубль) или отказ сервера по правилам — ошибки нет, но хода нет
+                            newRequestId = null
+                        }
+                        Log.d("GameRepository", "Invite transaction complete: committed=$committed, error=${error?.message}, outcome=$inviteTxOutcome")
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                })
+            }
+
+            txError?.let { throw it }
+
+            if (newRequestId == null) {
+                // Дубль — выходим без ошибки, но и без нового пуша
+                Log.d("GameRepository", "Skipping fcm_queue: no new request was created")
+                return@runCatchingResult
+            }
+
+            // Id созданного запроса — добавляем его в запись очереди,
+            // чтобы скрипт на Render удалил именно этот реквест после отправки пуша
+            val requestId = newRequestId!!
             
             // Создаем sessionId заранее для создания сессии
             val sessionId = if (splitFromUser < splitToUser) "${splitFromUser}_${splitToUser}" else "${splitToUser}_${splitFromUser}"
@@ -129,10 +273,13 @@ class GameRepository {
             Log.d("GameRepository", "Game session created and setup in PlayerOnline/$sessionId")
             Log.d("GameRepository", "Initial game board with cells 1-9 created in database")
             
-            // Сохраняем данные для FCM в отдельном узле для Cloud Function
+            // Сохраняем данные для FCM в отдельном узле для скрипта на Render.
+            // requestId — чтобы после отправки пуша скрипт вычеркнул именно этот реквест
+            // из users/<toUser>/request (а не все запросы подряд).
             val fcmData = mapOf(
                 "fromUser" to fromUser,
                 "toUser" to toUser,
+                "requestId" to requestId,
                 "token" to recipientToken,
                 "title" to "Запрос на игру",
                 "body" to "$fromUser приглашает вас сыграть в крестики-нолики!",
@@ -233,12 +380,20 @@ class GameRepository {
     }
     
     /**
-     * Очистка запроса пользователя после обработки
+     * Очистка запроса пользователя после обработки.
+     * Удаляет только запрос от конкретного отправителя (requesterEmail),
+     * а не весь узел request — иначе затрутся приглашения от других соседей.
      */
-    suspend fun clearGameRequest(userEmail: String): Result<Unit> {
+    suspend fun clearGameRequest(userEmail: String, requesterEmail: String): Result<Unit> {
         return runCatchingResult {
             val splitEmail = userEmail.substringBefore("@")
-            myRef.child("users").child(splitEmail).child("request").removeValue().await()
+            val requestsRef = myRef.child("users").child(splitEmail).child("request")
+            val snapshot = requestsRef.get().await()
+            snapshot.children.forEach { child ->
+                if (child.value?.toString() == requesterEmail) {
+                    child.ref.removeValue().await()
+                }
+            }
         }
     }
 
@@ -532,57 +687,74 @@ class GameRepository {
             // и будет отклонён. Раньше между get() и setValue() был сетевой зазор,
             // позволявший "пробить" несколько клеток за один ход.
             val sessionRef = myRef.child("PlayerOnline").child(sessionID)
-            val result = sessionRef.runTransaction(object : Transaction.Handler {
-                override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    val currentPlayer = currentData.child("currentTurn").getValue<String>() ?: ""
 
-                    if (currentPlayer != playerEmail) {
-                        Log.w(
-                            "GameRepository",
-                            "Attempted move by $playerEmail but it's $currentPlayer's turn!"
-                        )
-                        // Откатываем транзакцию - ход не засчитывается
-                        return Transaction.abort()
+            // Исход транзакции: "ok" | "not_your_turn" | "cell_occupied".
+            // Записывается из doTransaction (вызывается в том же стеке, видимость гарантирована).
+            var outcome = "not_your_turn"
+
+            // runTransaction возвращает Task<Transaction.Result>, к которому нельзя применить
+            // kotlinx.coroutines.tasks.await() — забираем результат через колбэк onComplete.
+            suspendCancellableCoroutine<Unit> { cont ->
+                sessionRef.runTransaction(object : Transaction.Handler {
+                    override fun doTransaction(currentData: MutableData): Transaction.Result {
+                        // Поле .value у MutableData имеет тип Object? — безопасно приводим к String
+                        val currentPlayer = currentData.child("currentTurn").value as? String ?: ""
+
+                        if (currentPlayer != playerEmail) {
+                            Log.w(
+                                "GameRepository",
+                                "Attempted move by $playerEmail but it's $currentPlayer's turn!"
+                            )
+                            outcome = "not_your_turn"
+                            // Откатываем транзакцию - ход не засчитывается
+                            return Transaction.abort()
+                        }
+
+                        val cellValue = currentData.child(cellId.toString()).value as? String
+                        if (!cellValue.isNullOrEmpty()) {
+                            Log.w("GameRepository", "Cell $cellId is already occupied by $cellValue")
+                            outcome = "cell_occupied"
+                            // Откатываем транзакцию - клетка занята
+                            return Transaction.abort()
+                        }
+
+                        val player1 = currentData.child("player1").value as? String ?: ""
+                        val player2 = currentData.child("player2").value as? String ?: ""
+                        val nextPlayer = if (currentPlayer == player1) player2 else player1
+
+                        // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
+                        // observeBoardState затем преобразует email в символ (X/O) на основе firstPlayer
+                        currentData.child(cellId.toString()).value = playerEmail
+                        currentData.child("currentTurn").value = nextPlayer
+
+                        Log.d("GameRepository", "Transaction: move at cell $cellId by $playerEmail ($symbol), switching turn from $currentPlayer to $nextPlayer")
+                        outcome = "ok"
+                        return Transaction.success(currentData)
                     }
 
-                    val cellValue = currentData.child(cellId.toString()).getValue<String>()
-                    if (!cellValue.isNullOrBlank()) {
-                        Log.w("GameRepository", "Cell $cellId is already occupied by $cellValue")
-                        // Откатываем транзакцию - клетка занята
-                        return Transaction.abort()
+                    override fun onComplete(error: DatabaseError?, committed: Boolean, currentValue: DataSnapshot?) {
+                        if (error != null || !committed) {
+                            Log.w("GameRepository", "makeMove transaction aborted/failed: ${error?.message}, committed=$committed")
+                        }
+                        if (cont.isActive) {
+                            if (error != null) {
+                                // Result здесь резолвится типом Unit, поэтому Kotlin не подставляет
+                                // обобщённый параметр у Result.failure(...) — указываем явно,
+                                // иначе ошибка компиляции "Unresolved reference 'failure'".
+                                cont.resumeWith(kotlin.Result.failure<Unit>(Exception(error.message)))
+                            } else {
+                                cont.resume(Unit)
+                            }
+                        }
                     }
-
-                    val player1 = currentData.child("player1").getValue<String>() ?: ""
-                    val player2 = currentData.child("player2").getValue<String>() ?: ""
-                    val nextPlayer = if (currentPlayer == player1) player2 else player1
-
-                    // Сохраняем email игрока в базу (Firebase использует ключи 1-9)
-                    // observeBoardState затем преобразует email в символ (X/O) на основе firstPlayer
-                    currentData.child(cellId.toString()).value = playerEmail
-                    currentData.child("currentTurn").value = nextPlayer
-
-                    Log.d("GameRepository", "Transaction: move at cell $cellId by $playerEmail ($symbol), switching turn from $currentPlayer to $nextPlayer")
-                    return Transaction.success(currentData)
-                }
-
-                override fun onComplete(error: DatabaseError?, committed: Boolean, currentValue: DataSnapshot?) {
-                    if (error != null || !committed) {
-                        Log.w("GameRepository", "makeMove transaction aborted/failed: ${error?.message}, committed=$committed")
-                    }
-                }
-            }).await()
-
-            if (!result.committed) {
-                // Транзакция была прервана (не ваш ход или клетка занята)
-                val cellAfterAbort = result.currentData?.child(cellId.toString())?.getValue(String::class.java)
-                if (!cellAfterAbort.isNullOrBlank()) {
-                    throw Exception("Клетка уже занята!")
-                } else {
-                    throw Exception("Сейчас не ваш ход!")
-                }
+                })
             }
 
-            Log.d("GameRepository", "Move committed successfully: cell $cellId by $playerEmail ($symbol)")
+            when (outcome) {
+                "cell_occupied" -> throw Exception("Клетка уже занята!")
+                "ok" -> Log.d("GameRepository", "Move committed successfully: cell $cellId by $playerEmail ($symbol)")
+                else -> throw Exception("Сейчас не ваш ход!")
+            }
         }
     }
     

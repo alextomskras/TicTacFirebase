@@ -12,9 +12,11 @@ import android.view.View
 import android.view.animation.AnimationUtils
 import android.widget.Button
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import coil.load
@@ -74,8 +76,29 @@ open class MainActivity : AppCompatActivity() {
     private val bu8 by lazy { findViewById<Button>(R.id.bu8) }
     private val bu9 by lazy { findViewById<Button>(R.id.bu9) }
 
+    /**
+     * Возврат с экрана «Соседи»: если сосед выбран для приглашения —
+     * подставляем его email и отправляем запрос на игру как по кнопке Request.
+     */
+    private val neighborsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val inviteEmail = result.data?.getStringExtra(AppConstants.KEY_INVITE_EMAIL)
+        if (result.resultCode == RESULT_OK && !inviteEmail.isNullOrBlank()) {
+            etEmail.setText(inviteEmail)
+            buRequestEvent(buRequest)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Принудительно включаем «вписывание в системные окна» ДО setContentView:
+        // на новых Android (One UI Samsung и т.п.) AppCompat по умолчанию отдаёт
+        // контент под статус-бар (edge-to-edge), из-за чего кнопки Accept/Request
+        // первого ряда оказываются в одной полосе с тулбаром ("подъехали под верхнее меню").
+        // setDecorFitsSystemWindows(true) возвращает классическое поведение:
+        // AppCompat сам добавит content-у отступ на высоту статус-бара, тулбар встанет под него.
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setContentView(R.layout.activity_main)
 
         // Запрос разрешения на уведомления для Android 13+
@@ -105,6 +128,9 @@ open class MainActivity : AppCompatActivity() {
         myEmail = b?.getString(AppConstants.KEY_EMAIL)
         Log.d(TAG, "getExtraEmail: $myEmail")
         supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
+
+        // Presence: отмечаем себя онлайн (onDisconnect сам снимет флаг при закрытии приложения)
+        myEmail?.let { gameRepository.setPresence(it) }
         
         // Обновляем статус подключения
         updateConnectionStatus(getString(R.string.connecting))
@@ -235,8 +261,10 @@ open class MainActivity : AppCompatActivity() {
                             Toast.LENGTH_LONG
                         ).show()
                         
-                        // Очищаем запрос после обработки
-                        gameViewModel.clearGameRequest(email.splitEmail())
+                        // Очищаем ТОЛЬКО этот запрос после обработки (обработчик срабатывает
+                        // один раз на каждый новый реквест; повторный collect не нужен,
+                        // т.к. removeValue ниже уберёт данные и событий больше не будет)
+                        gameViewModel.clearGameRequest(email.splitEmail(), requesterEmail)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error processing incoming request: ${e.message}")
@@ -567,7 +595,14 @@ open class MainActivity : AppCompatActivity() {
      */
     fun buLogoutEvent(view: View) {
         Log.d(TAG, "User logged out")
-        
+
+        // Presence: снимаем флаг «онлайн», чтобы нас не показывали в списке соседей
+        myEmail?.let { email ->
+            lifecycleScope.launch {
+                GameRepository().removePresence(email)
+            }
+        }
+
         // Выход из Firebase Authentication
         FirebaseAuth.getInstance().signOut()
         
@@ -687,12 +722,27 @@ open class MainActivity : AppCompatActivity() {
                 startNewGame()
                 true
             }
+            R.id.action_neighbors -> {
+                openNeighborsScreen()
+                true
+            }
             R.id.action_logout -> {
                 buLogoutEvent(findViewById(android.R.id.content))
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    /**
+     * Открывает экран «Соседи» (список игроков с индикатором онлайна
+     * и кнопкой приглашения на партию).
+     */
+    private fun openNeighborsScreen() {
+        val intent = Intent(this, OnlineUsersActivity::class.java).apply {
+            putExtra(AppConstants.KEY_EMAIL, myEmail)
+        }
+        neighborsLauncher.launch(intent)
     }
 
 }

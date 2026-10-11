@@ -25,11 +25,26 @@
         ".write": "auth != null && (!data.exists() || newData.exists()) && (!newData.exists() || newData.val() == $token)"
       }
     },
+    // presence («онлайн» для списка соседей): читать может любой вошедший,
+    // писать — только в свой узел presence/<логин> (логин = email до '@')
+    "presence": {
+      ".read": "auth != null",
+      "$userId": {
+        ".write": "auth != null && $userId == auth.token.email.split('@')[0]"
+      }
+    },
     "PlayerOnline": {
       "$sessionId": {
-        // доступ к партии — только её участникам (email до @ входит в имя сессии)
-        ".read": "auth != null && (root.child('PlayerOnline').child($sessionId).child('player1').val() == auth.token.email.split('@')[0] || root.child('PlayerOnline').child($sessionId).child('player2').val() == auth.token.email.split('@')[0])",
-        ".write": "auth != null && (root.child('PlayerOnline').child($sessionId).child('player1').val() == auth.token.email.split('@')[0] || root.child('PlayerOnline').child($sessionId).child('player2').val() == auth.token.email.split('@')[0])"
+        // Доступ к партии — её участникам. КРИТИЧНО: при отправке приглашения узел
+        // PlayerOnline/<sessionId> ещё НЕ существует (player1/player2 не прочитаны),
+        // поэтому разрешаем СОЗДАНИЕ записи любому вошедшему пользователю (!data.exists()),
+        // а дальнейшие чтение/запись — только тем, кто записан в player1/player2
+        // (сверяется логин = email до '@', как и пишет клиент).
+        ".read": "auth != null && data.exists() && (root.child('PlayerOnline').child($sessionId).child('player1').val() == auth.token.email.split('@')[0] || root.child('PlayerOnline').child($sessionId).child('player2').val() == auth.token.email.split('@')[0])",
+        ".write": "auth != null && (!data.exists() || root.child('PlayerOnline').child($sessionId).child('player1').val() == auth.token.email.split('@')[0] || root.child('PlayerOnline').child($sessionId).child('player2').val() == auth.token.email.split('@')[0])",
+        // защита от подмены: нельзя перезаписать существующую партию так, чтобы
+        // убрать из неё участников или пересоздать поле хода без их участия
+        ".validate": "!data.exists() || newData.hasChildren(['player1','player2']) || newData.isString() || newData.val() == null"
       }
     },
     "fcm_queue": {
