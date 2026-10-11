@@ -119,16 +119,15 @@ class GameRepository {
                         return Transaction.success(currentData)
                     }
 
-                    override fun onComplete(
-                        error: DatabaseError?,
-                        committed: Boolean,
-                        currentData: MutableData?
-                    ) {
+                    // Сигнатура ровно как в работающей транзакции makeMove() ниже:
+                    // третий параметр — DataSnapshot?, а НЕ MutableData? (иначе
+                    // "onComplete overrides nothing" и класс не реализует абстрактный метод).
+                    override fun onComplete(error: DatabaseError?, committed: Boolean, currentValue: DataSnapshot?) {
                         if (error != null) {
                             txError = Exception("Не удалось отправить приглашение: ${error.message}")
                         }
                         Log.d("GameRepository", "Invite transaction complete: committed=$committed, outcome=$inviteTxOutcome")
-                        cont.resume(Unit)
+                        if (cont.isActive) cont.resume(Unit)
                     }
                 })
             }
