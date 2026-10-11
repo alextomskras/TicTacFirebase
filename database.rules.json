@@ -4,13 +4,40 @@
     ".write": "auth != null",
     "users": {
       "$userId": {
+        // читать профиль может любой вошедший пользователь (нужно для поиска/приглашений)
         ".read": "auth != null",
-        ".write": "$userId === auth.uid || root.child('users').child($userId).child('email').val() === auth.token.email"
+        // писать — только в свой узел; узел называется по логину (email без @domain),
+        // поэтому сверяем имя узла ($userId) с первой частью собственного email.
+        // Проверяются и новые, и старые данные: LoginActivity пишет только child newToken
+        // (без поля username), registerActivity при создании профиля тоже добавляет uid/аватар
+        ".write": "($userId == auth.token.email.split('@')[0] && (data.exists() || newData.child('uid').exists())) || newData.child('username').val() == auth.token.email.split('@')[0] || data.child('username').val() == auth.token.email.split('@')[0]",
+        // приглашение на игру: любой вошедший пользователь может отправить запрос (push в child 'request'),
+        // но не может читать/менять чужие поля профиля — права наследуются сюда и отменяют родительский .read
+        "request": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    // легаси-узел со списком FCM-токенов: значения совпадают с ключами, пишет только владелец токена
+    "Tokens": {
+      "$token": {
+        ".write": "auth != null && (!data.exists() || newData.exists()) && (!newData.exists() || newData.val() == $token)"
       }
     },
     "PlayerOnline": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      "$sessionId": {
+        // доступ к партии — только её участникам (email до @ входит в имя сессии)
+        ".read": "auth != null && (root.child('PlayerOnline').child($sessionId).child('player1').val() == auth.token.email.split('@')[0] || root.child('PlayerOnline').child($sessionId).child('player2').val() == auth.token.email.split('@')[0])",
+        ".write": "auth != null && (root.child('PlayerOnline').child($sessionId).child('player1').val() == auth.token.email.split('@')[0] || root.child('PlayerOnline').child($sessionId).child('player2').val() == auth.token.email.split('@')[0])"
+      }
+    },
+    "fcm_queue": {
+      // очередь пушей: клиент только создаёт записи, читает и удаляет их Cloud Function (Admin SDK минует правила)
+      ".read": false,
+      "$pushId": {
+        ".write": "auth != null && !data.exists() && newData.child('toUser').exists() && newData.child('token').exists()"
+      }
     }
   }
 }
