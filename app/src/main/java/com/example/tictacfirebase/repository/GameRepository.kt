@@ -85,8 +85,55 @@ class GameRepository {
             
             Log.d("GameRepository", "Found token for user $splitToUser, sending game request")
             
-            // Сохраняем запрос в БД
-            myRef.child("users").child(splitToUser).child("request").push().setValue(fromUser).await()
+            // ВАЖНО: Атомарно проверяем и создаём приглашение одной транзакцией.
+            // Без этого два быстрых тапа (или два устройства) успевали создать ДВА запроса,
+            // потому что проверка "alreadyInvited" выше и запись push() — это отдельные операции.
+            // Аналогично makeMove(): suspendCancellableCoroutine + onComplete вместо await(),
+            // т.к. kotlinx await() не даёт типизированного доступа к Transaction.Result.
+            val requestNode = myRef.child("users").child(splitToUser).child("request")
+            var newRequestId: String? = null   // id созданного запроса (null = дубль, пуш не шлём)
+            var txError: Exception? = null
+
+            suspendCancellableCoroutine<Unit> { cont ->
+                requestNode.runTransaction(object : Transaction.Handler {
+                    override fun onComplete(
+                        error: DatabaseError?,
+                        committed: Boolean,
+                        result: Transaction.Result?
+                    ) {
+                        if (error != null) {
+                            txError = Exception("Не удалось отправить приглашение: ${error.message}")
+                        } else if (committed && result != null) {
+                            val td = result.currentData
+                            val alreadyExists = td.children.any { child ->
+                                (child.value as? String) == fromUser
+                            }
+                            if (alreadyExists) {
+                                // Приглашение от этого пользователя уже есть — не дублируем.
+                                // Ничего не записываем, newRequestId остаётся null.
+                                Log.d("GameRepository", "Duplicate invitation suppressed by transaction: $fromUser -> $toUser")
+                            } else {
+                                val pushed = td.push()
+                                pushed.setValue(fromUser)
+                                newRequestId = pushed.key
+                            }
+                        }
+                        cont.resume(Unit)
+                    }
+                })
+            }
+
+            txError?.let { throw it }
+
+            if (newRequestId == null) {
+                // Дубль — выходим без ошибки, но и без нового пуша
+                Log.d("GameRepository", "Skipping fcm_queue: no new request was created")
+                return@runCatchingResult
+            }
+
+            // Id созданного запроса — добавляем его в запись очереди,
+            // чтобы скрипт на Render удалил именно этот реквест после отправки пуша
+            val requestId = newRequestId!!
             
             // Создаем sessionId заранее для создания сессии
             val sessionId = if (splitFromUser < splitToUser) "${splitFromUser}_${splitToUser}" else "${splitToUser}_${splitFromUser}"
@@ -131,10 +178,13 @@ class GameRepository {
             Log.d("GameRepository", "Game session created and setup in PlayerOnline/$sessionId")
             Log.d("GameRepository", "Initial game board with cells 1-9 created in database")
             
-            // Сохраняем данные для FCM в отдельном узле для Cloud Function
+            // Сохраняем данные для FCM в отдельном узле для скрипта на Render.
+            // requestId — чтобы после отправки пуша скрипт вычеркнул именно этот реквест
+            // из users/<toUser>/request (а не все запросы подряд).
             val fcmData = mapOf(
                 "fromUser" to fromUser,
                 "toUser" to toUser,
+                "requestId" to requestId,
                 "token" to recipientToken,
                 "title" to "Запрос на игру",
                 "body" to "$fromUser приглашает вас сыграть в крестики-нолики!",
@@ -235,12 +285,20 @@ class GameRepository {
     }
     
     /**
-     * Очистка запроса пользователя после обработки
+     * Очистка запроса пользователя после обработки.
+     * Удаляет только запрос от конкретного отправителя (requesterEmail),
+     * а не весь узел request — иначе затрутся приглашения от других соседей.
      */
-    suspend fun clearGameRequest(userEmail: String): Result<Unit> {
+    suspend fun clearGameRequest(userEmail: String, requesterEmail: String): Result<Unit> {
         return runCatchingResult {
             val splitEmail = userEmail.substringBefore("@")
-            myRef.child("users").child(splitEmail).child("request").removeValue().await()
+            val requestsRef = myRef.child("users").child(splitEmail).child("request")
+            val snapshot = requestsRef.get().await()
+            snapshot.children.forEach { child ->
+                if (child.value?.toString() == requesterEmail) {
+                    child.ref.removeValue().await()
+                }
+            }
         }
     }
 

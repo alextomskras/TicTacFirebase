@@ -235,8 +235,10 @@ open class MainActivity : AppCompatActivity() {
                             Toast.LENGTH_LONG
                         ).show()
                         
-                        // Очищаем запрос после обработки
-                        gameViewModel.clearGameRequest(email.splitEmail())
+                        // Очищаем ТОЛЬКО этот запрос после обработки (обработчик срабатывает
+                        // один раз на каждый новый реквест; повторный collect не нужен,
+                        // т.к. removeValue ниже уберёт данные и событий больше не будет)
+                        gameViewModel.clearGameRequest(email.splitEmail(), requesterEmail)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error processing incoming request: ${e.message}")

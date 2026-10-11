@@ -90,10 +90,11 @@ class GameViewModel(
     }
 
     /**
-     * Очистка запроса на игру после обработки
+     * Очистка запроса на игру после обработки.
+     * Удаляет только запрос от конкретного отправителя, а не весь список.
      */
-    suspend fun clearGameRequest(userEmail: String) {
-        gameRepository.clearGameRequest(userEmail)
+    suspend fun clearGameRequest(userEmail: String, requesterEmail: String) {
+        gameRepository.clearGameRequest(userEmail, requesterEmail)
     }
 
     /**
