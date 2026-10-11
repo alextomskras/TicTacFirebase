@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import coil.load
@@ -76,6 +77,13 @@ open class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Принудительно включаем «вписывание в системные окна» ДО setContentView:
+        // на новых Android (One UI Samsung и т.п.) AppCompat по умолчанию отдаёт
+        // контент под статус-бар (edge-to-edge), из-за чего кнопки Accept/Request
+        // первого ряда оказываются в одной полосе с тулбаром ("подъехали под верхнее меню").
+        // setDecorFitsSystemWindows(true) возвращает классическое поведение:
+        // AppCompat сам добавит content-у отступ на высоту статус-бара, тулбар встанет под него.
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setContentView(R.layout.activity_main)
 
         // Запрос разрешения на уведомления для Android 13+
