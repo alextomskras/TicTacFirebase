@@ -113,6 +113,9 @@ open class MainActivity : AppCompatActivity() {
         myEmail = b?.getString(AppConstants.KEY_EMAIL)
         Log.d(TAG, "getExtraEmail: $myEmail")
         supportActionBar?.title = getString(R.string.app_name) + " $myEmail"
+
+        // Presence: отмечаем себя онлайн (onDisconnect сам снимет флаг при закрытии приложения)
+        myEmail?.let { gameRepository.setPresence(it) }
         
         // Обновляем статус подключения
         updateConnectionStatus(getString(R.string.connecting))
@@ -577,7 +580,14 @@ open class MainActivity : AppCompatActivity() {
      */
     fun buLogoutEvent(view: View) {
         Log.d(TAG, "User logged out")
-        
+
+        // Presence: снимаем флаг «онлайн», чтобы нас не показывали в списке соседей
+        myEmail?.let { email ->
+            lifecycleScope.launch {
+                GameRepository().removePresence(email)
+            }
+        }
+
         // Выход из Firebase Authentication
         FirebaseAuth.getInstance().signOut()
         

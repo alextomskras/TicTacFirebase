@@ -33,6 +33,73 @@ class GameRepository {
             myRef.child("users").child(userId).child("newToken").setValue(token).await()
         }
     }
+
+    /**
+     * Presence: отмечает пользователя «в сети» (узел presence/<username>).
+     * onDisconnect сам удалит запись при закрытии приложения/обрыве соединения.
+     */
+    fun setPresence(email: String) {
+        val username = email.substringBefore("@")
+        val presenceRef = myRef.child("presence").child(username)
+        presenceRef.onDisconnect().removeValue()
+        presenceRef.setValue(mapOf("lastSeen" to System.currentTimeMillis()))
+    }
+
+    /**
+     * Presence: снимает флаг «онлайн» (например, при выходе из аккаунта).
+     */
+    suspend fun removePresence(email: String): Result<Unit> {
+        return runCatchingResult {
+            val username = email.substringBefore("@")
+            myRef.child("presence").child(username).removeValue().await()
+        }
+    }
+
+    /**
+     * Список соседей: все зарегистрированные пользователи с флагом онлайн
+     * (по наличию узла presence/<username>).
+     */
+    fun observeUsers(): Flow<List<com.example.tictacfirebase.model.OnlineUser>> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    val users = mutableListOf<com.example.tictacfirebase.model.OnlineUser>()
+                    snapshot.children.forEach { userSnap ->
+                        val username = userSnap.key ?: return@forEach
+                        val email = userSnap.child("email").value as? String ?: "$username@mail.ru"
+                        val avatar = userSnap.child("profileImageUrl").value as? String
+                        users.add(
+                            com.example.tictacfirebase.model.OnlineUser(
+                                username = username,
+                                email = email,
+                                isOnline = false,
+                                profileImageUrl = avatar
+                            )
+                        )
+                    }
+                    // Отдельно читаем presence и помечаем онлайн-игроков
+                    myRef.child("presence").get().addOnSuccessListener { presSnap ->
+                        val onlineNames = presSnap.children.mapNotNull { it.key }.toSet()
+                        trySend(users.map { it.copy(isOnline = onlineNames.contains(it.username)) })
+                    }.addOnFailureListener {
+                        trySend(users)
+                    }
+                } catch (e: Exception) {
+                    println("observeUsers error: $e")
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                println("observeUsers cancelled: ${error.message}")
+            }
+        }
+
+        myRef.child("users").addValueEventListener(listener)
+
+        awaitClose {
+            myRef.child("users").removeEventListener(listener)
+        }
+    }
     
     /**
      * Отправка запроса на игру другому пользователю

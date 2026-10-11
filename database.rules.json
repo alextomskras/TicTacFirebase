@@ -25,6 +25,14 @@
         ".write": "auth != null && (!data.exists() || newData.exists()) && (!newData.exists() || newData.val() == $token)"
       }
     },
+    // presence («онлайн» для списка соседей): читать может любой вошедший,
+    // писать — только в свой узел presence/<логин> (логин = email до '@')
+    "presence": {
+      ".read": "auth != null",
+      "$userId": {
+        ".write": "auth != null && $userId == auth.token.email.split('@')[0]"
+      }
+    },
     "PlayerOnline": {
       "$sessionId": {
         // Доступ к партии — её участникам. КРИТИЧНО: при отправке приглашения узел
