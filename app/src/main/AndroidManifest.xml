@@ -31,6 +31,7 @@
         <activity android:name=".MainActivity" android:exported="false">
 
         </activity>
+        <activity android:name=".OnlineUsersActivity" android:exported="false" />
 
         <!--FCM-->
         <meta-data

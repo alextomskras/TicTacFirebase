@@ -30,4 +30,14 @@
     <string name="menu_logout">Выйти</string>
     <string name="menu_new_game">Новая игра</string>
     <string name="menu_profile">Профиль</string>
+    <string name="menu_neighbors">Соседи</string>
+
+    <!-- Экран «Соседи» -->
+    <string name="neighbors_title">Соседи</string>
+    <string name="no_neighbors_yet">Пока никого нет. Позовите друзей играть!</string>
+    <string name="error_loading_neighbors">Не удалось загрузить список: %1$s</string>
+    <string name="online_label">В сети</string>
+    <string name="offline_label">Не в сети</string>
+    <string name="you_label">Это вы</string>
+    <string name="invite_button">Играть</string>
 </resources>

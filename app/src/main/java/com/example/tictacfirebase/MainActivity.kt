@@ -12,6 +12,7 @@ import android.view.View
 import android.view.animation.AnimationUtils
 import android.widget.Button
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -74,6 +75,20 @@ open class MainActivity : AppCompatActivity() {
     private val bu7 by lazy { findViewById<Button>(R.id.bu7) }
     private val bu8 by lazy { findViewById<Button>(R.id.bu8) }
     private val bu9 by lazy { findViewById<Button>(R.id.bu9) }
+
+    /**
+     * Возврат с экрана «Соседи»: если сосед выбран для приглашения —
+     * подставляем его email и отправляем запрос на игру как по кнопке Request.
+     */
+    private val neighborsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val inviteEmail = result.data?.getStringExtra(AppConstants.KEY_INVITE_EMAIL)
+        if (result.resultCode == RESULT_OK && !inviteEmail.isNullOrBlank()) {
+            etEmail.setText(inviteEmail)
+            buRequestEvent(buRequest)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -707,12 +722,27 @@ open class MainActivity : AppCompatActivity() {
                 startNewGame()
                 true
             }
+            R.id.action_neighbors -> {
+                openNeighborsScreen()
+                true
+            }
             R.id.action_logout -> {
                 buLogoutEvent(findViewById(android.R.id.content))
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    /**
+     * Открывает экран «Соседи» (список игроков с индикатором онлайна
+     * и кнопкой приглашения на партию).
+     */
+    private fun openNeighborsScreen() {
+        val intent = Intent(this, OnlineUsersActivity::class.java).apply {
+            putExtra(AppConstants.KEY_EMAIL, myEmail)
+        }
+        neighborsLauncher.launch(intent)
     }
 
 }

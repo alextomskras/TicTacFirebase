@@ -56,6 +56,18 @@ class GameRepository {
     }
 
     /**
+     * Принудительно обновляет наше presence-время (для pull-to-refresh на экране «Соседи»,
+     * чтобы наш статус точно был свежим).
+     */
+    suspend fun refreshPresenceOnce(email: String): Result<Unit> {
+        return runCatchingResult {
+            val username = email.substringBefore("@")
+            myRef.child("presence").child(username)
+                .setValue(mapOf("lastSeen" to System.currentTimeMillis())).await()
+        }
+    }
+
+    /**
      * Список соседей: все зарегистрированные пользователи с флагом онлайн
      * (по наличию узла presence/<username>).
      */
