@@ -93,31 +93,41 @@ class GameRepository {
             val requestNode = myRef.child("users").child(splitToUser).child("request")
             var newRequestId: String? = null   // id созданного запроса (null = дубль, пуш не шлём)
             var txError: Exception? = null
+            var inviteTxOutcome = "pending"    // ok / duplicate — пишется из doTransaction
 
             suspendCancellableCoroutine<Unit> { cont ->
                 requestNode.runTransaction(object : Transaction.Handler {
+                    // doTransaction вызывается синхронно в том же стеке, что и runTransaction,
+                    // поэтому outcome-флаг читаем сразу после запуска транзакции.
+                    override fun doTransaction(currentData: MutableData): Transaction.Result {
+                        val alreadyExists = currentData.children.any { child ->
+                            (child.value as? String) == fromUser
+                        }
+                        if (alreadyExists) {
+                            // Приглашение от этого пользователя уже есть — не дублируем,
+                            // пуш в очередь не кладём.
+                            Log.d("GameRepository", "Duplicate invitation suppressed by transaction: $fromUser -> $toUser")
+                            inviteTxOutcome = "duplicate"
+                            return Transaction.abort()
+                        }
+                        val pushedKey = requestNode.push().key
+                        if (pushedKey != null) {
+                            currentData.child(pushedKey).setValue(fromUser)
+                            newRequestId = pushedKey
+                        }
+                        inviteTxOutcome = "ok"
+                        return Transaction.success(currentData)
+                    }
+
                     override fun onComplete(
                         error: DatabaseError?,
                         committed: Boolean,
-                        result: Transaction.Result?
+                        currentData: MutableData?
                     ) {
                         if (error != null) {
                             txError = Exception("Не удалось отправить приглашение: ${error.message}")
-                        } else if (committed && result != null) {
-                            val td = result.currentData
-                            val alreadyExists = td.children.any { child ->
-                                (child.value as? String) == fromUser
-                            }
-                            if (alreadyExists) {
-                                // Приглашение от этого пользователя уже есть — не дублируем.
-                                // Ничего не записываем, newRequestId остаётся null.
-                                Log.d("GameRepository", "Duplicate invitation suppressed by transaction: $fromUser -> $toUser")
-                            } else {
-                                val pushed = td.push()
-                                pushed.setValue(fromUser)
-                                newRequestId = pushed.key
-                            }
                         }
+                        Log.d("GameRepository", "Invite transaction complete: committed=$committed, outcome=$inviteTxOutcome")
                         cont.resume(Unit)
                     }
                 })
