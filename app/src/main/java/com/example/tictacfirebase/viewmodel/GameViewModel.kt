@@ -9,6 +9,8 @@ import com.example.tictacfirebase.model.GameStatus
 import com.example.tictacfirebase.model.UiEffect
 import com.example.tictacfirebase.model.UiEvent
 import com.example.tictacfirebase.repository.GameRepository
+import com.example.tictacfirebase.utils.asCanonicalPlayer
+import com.example.tictacfirebase.utils.samePlayer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +39,10 @@ class GameViewModel(
     val uiEffect: SharedFlow<UiEffect> = _uiEffect.asSharedFlow()
 
     private val gameManager = GameManager()
+
+    // Флаг защиты от двойных отправок хода (пока ход в полёте, клики игнорируются)
+    @Volatile
+    private var isMoveInProgress = false
     
     // Идентификатор текущей игры - может быть обновлен при создании/присоединении к новой игре
     private var _gameId: String = initialGameId
@@ -134,12 +140,14 @@ class GameViewModel(
                 // Определяем являюсь ли я первым игроком (X) или вторым (O)
                 // Сравниваем мой email из состояния с firstPlayer из БД
                 val myEmailFromState = _gameState.value.currentPlayerName
+                // Сравнения игроков — только через samePlayer() (единый канон trim+lowercase),
+                // иначе из-за разного регистра email оба клиента решают, что ход их.
                 val amIFirstPlayer = if (myEmailFromState.isNotEmpty()) {
-                    myEmailFromState == firstPlayer
+                    samePlayer(myEmailFromState, firstPlayer)
                 } else {
                     // Если имя еще не установлено, пытаемся определить из сессии
                     // Берем player1 как fallback (обычно player1 == firstPlayer)
-                    sessionInfo.player1 == firstPlayer
+                    samePlayer(sessionInfo.player1, firstPlayer)
                 }
                 
                 // Определяем имена игроков
@@ -161,7 +169,7 @@ class GameViewModel(
                         opponentAvatarUrl = opponentAvatar,
                         isLoading = false,
                         sessionId = gameId,
-                        isMyTurn = currentTurn == myName,
+                        isMyTurn = samePlayer(currentTurn, myName),
                         gameStatus = GameStatus.Playing,
                         // isFirstPlayer = true означает что я играю за X, false = играю за O
                         isFirstPlayer = amIFirstPlayer
@@ -264,29 +272,29 @@ class GameViewModel(
                                 
                                 // Определяем являюсь ли я первым игроком по сравнению с firstPlayer
                                 // Используем player1 как fallback для определения моего имени
-                                myName = if (sessionInfo.player1 == firstPlayer) {
+                                myName = if (samePlayer(sessionInfo.player1, firstPlayer)) {
                                     sessionInfo.player1
                                 } else {
                                     sessionInfo.player2
                                 }
                                 
                                 // Обновляем opponentName и isFirstPlayer
-                                val opponentName = if (myName == firstPlayer) sessionInfo.player2 else sessionInfo.player1
-                                val amIFirstPlayer = (myName == firstPlayer)
+                                val opponentName = if (samePlayer(myName, firstPlayer)) sessionInfo.player2 else sessionInfo.player1
+                                val amIFirstPlayer = samePlayer(myName, firstPlayer)
                                 
                                 updateState {
                                     copy(
                                         currentPlayerName = myName,
                                         opponentName = opponentName,
                                         isFirstPlayer = amIFirstPlayer,
-                                        isMyTurn = currentTurn == myName
+                                        isMyTurn = samePlayer(currentTurn, myName)
                                     )
                                 }
                                 return@collect
                             }
                         }
                         
-                        val isMyTurn = currentTurn == myName
+                        val isMyTurn = samePlayer(currentTurn, myName)
                         
                         updateState {
                             copy(isMyTurn = isMyTurn)
@@ -384,7 +392,12 @@ class GameViewModel(
      * Отправка запроса на игру другому пользователю
      * ПРОВЕРЯЕТ: нет ли уже активного приглашения
      */
-    private fun sendGameRequest(fromEmail: String, toEmail: String) {
+    private fun sendGameRequest(fromEmailRaw: String, toEmailRaw: String) {
+        // КАНОН ИДЕНТИФИКАТОРОВ: email вводятся вручную (etEmail) и могут отличаться
+        // регистром; все значения, которые пишутся в БД и сравниваются с currentTurn,
+        // приводим к канону trim+lowercase ОДИН раз на входе.
+        val fromEmail = fromEmailRaw.asCanonicalPlayer()
+        val toEmail = toEmailRaw.asCanonicalPlayer()
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
             try {
@@ -443,8 +456,10 @@ class GameViewModel(
      * Например: "user1_user2" вместо "user2_user1"
      */
     private fun generateSessionId(email1: String, email2: String): String {
-        val name1 = email1.substringBefore("@")
-        val name2 = email2.substringBefore("@")
+        // sessionId должен быть симметричным и одинаковым у обоих клиентов:
+        // канон (trim+lowercase) + substringBefore("@") — ровно как в GameRepository.sendGameRequest()
+        val name1 = email1.asCanonicalPlayer().substringBefore("@")
+        val name2 = email2.asCanonicalPlayer().substringBefore("@")
         return if (name1 < name2) {
             "${name1}_${name2}"
         } else {
@@ -458,7 +473,11 @@ class GameViewModel(
      * ОТПРАВИТЕЛЬ запроса (fromEmail) получает "X" и ходит первым
      * ПРИНЯВШИЙ запрос (toEmail) получает "O" и ходит вторым
      */
-    private fun acceptGameRequest(fromEmail: String, toEmail: String) {
+    private fun acceptGameRequest(fromEmailRaw: String, toEmailRaw: String) {
+        // КАНОН ИДЕНТИФИКАТОРОВ: requesterEmail приходит из узла users/*/request и может
+        // отличаться регистром от введенного вручную myEmail — нормализуем оба.
+        val fromEmail = fromEmailRaw.asCanonicalPlayer()
+        val toEmail = toEmailRaw.asCanonicalPlayer()
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
             try {
@@ -544,21 +563,30 @@ class GameViewModel(
 
     fun makeMove(cellIndexFromUi: Int) {
         viewModelScope.launch {
-            // Преобразуем индекс из UI (1-9) в индекс массива (0-8)
-            val cellIndex = cellIndexFromUi - 1
-            
             val currentState = _gameState.value
-            
+
+            // Защита от повторного входа: ход уже в полёте — игнорируем все клики
+            if (isMoveInProgress) {
+                Log.d("GameViewModel", "makeMove ignored: move already in progress")
+                return@launch
+            }
+
             // Блокируем ходы если нет интернета
             if (!currentState.isOnline) {
                 sendEffect(UiEffect.ShowToast("Нет подключения к интернету"))
                 return@launch
             }
-            
+
             if (!currentState.isMyTurn || currentState.gameStatus != GameStatus.Playing) {
                 sendEffect(UiEffect.ShowToast("Не ваш ход!"))
                 return@launch
             }
+
+            // ВАЖНО про нейминг клеток:
+            // - UI и БД используют клетки 1..9 (в PlayerOnline/{sessionId} ключи "1".."9");
+            // - локальный boardState во ViewModel — это 0-based массив (индексы 0..8).
+            // Конверсия 1-based <-> 0-based выполняется только здесь.
+            val cellIndex = cellIndexFromUi - 1 // 0-based индекс для локального массива
 
             // Проверяем занята ли клетка в локальном состоянии
             val board = currentState.boardState
@@ -566,7 +594,7 @@ class GameViewModel(
                 sendEffect(UiEffect.ShowToast("Неверный индекс клетки"))
                 return@launch
             }
-            
+
             if (board[cellIndex].isNotEmpty()) {
                 sendEffect(UiEffect.ShowToast("Клетка занята"))
                 return@launch // Клетка занята
@@ -575,22 +603,37 @@ class GameViewModel(
             // Определяем мой символ через isFirstPlayer - первый игрок (X), второй игрок (O)
             val mySymbol = if (currentState.isFirstPlayer) "X" else "O"
 
-            // Проверка: является ли текущий игрок тем, чей сейчас ход
-            // Используем isMyTurn из состояния, которое обновляется через observeCurrentTurn
-            if (!currentState.isMyTurn) {
-                sendEffect(UiEffect.ShowToast("Сейчас не ваш ход!"))
-                return@launch
-            }
+            isMoveInProgress = true
+            try {
+                // Немедленно блокируем кнопки до подтверждения хода сервером,
+                // чтобы нельзя было натыкать несколько клеток за время сетевого round-trip
+                updateState {
+                    copy(
+                        boardState = board.toMutableList().also { it[cellIndex] = mySymbol },
+                        isMyTurn = false
+                    )
+                }
 
-            // Отправляем ход на сервер (один атомарный вызов)
-            // Передаём cellIndexFromUi для записи в БД (ключи 1-9)
-            val moveResult = gameRepository.makeMove(gameId, cellIndexFromUi, currentState.currentPlayerName, mySymbol)
-            
-            if (moveResult is com.example.tictacfirebase.utils.Result.Error) {
-                val errorMessage = moveResult.message ?: moveResult.exception.message ?: "Неизвестная ошибка"
-                sendEffect(UiEffect.ShowToast("Ошибка хода: $errorMessage"))
+                // Отправляем ход на сервер (атомарная транзакция)
+                // Передаём cellIndexFromUi (1-9) для записи в БД (ключи клеток "1".."9")
+                val moveResult = gameRepository.makeMove(gameId, cellIndexFromUi, currentState.currentPlayerName, mySymbol)
+
+                if (moveResult is com.example.tictacfirebase.utils.Result.Error) {
+                    val errorMessage = moveResult.message ?: moveResult.exception.message ?: "Неизвестная ошибка"
+                    Log.w("GameViewModel", "makeMove rejected: $errorMessage")
+                    sendEffect(UiEffect.ShowToast("Ход отклонён: $errorMessage"))
+                    // Откатываем оптимистичное обновление; актуальное состояние придёт из БД
+                    val turnResult = gameRepository.getCurrentTurn(gameId)
+                    val stillMyTurn = turnResult is com.example.tictacfirebase.utils.Result.Success &&
+                            turnResult.data.equals(currentState.currentPlayerName, ignoreCase = true)
+                    updateState {
+                        copy(boardState = board, isMyTurn = stillMyTurn)
+                    }
+                }
+                // В случае успеха состояние доски/хода синхронизируется через observeBoardState и observeCurrentTurn
+            } finally {
+                isMoveInProgress = false
             }
-            // В случае успеха ничего не делаем - состояние обновится через observeBoardState и observeCurrentTurn
         }
     }
 
@@ -608,10 +651,10 @@ class GameViewModel(
                     copy(
                         boardState = List(9) { "" },
                         gameStatus = GameStatus.Playing,
-                        isMyTurn = firstPlayer == currentState.currentPlayerName
+                        isMyTurn = samePlayer(firstPlayer, currentState.currentPlayerName)
                     )
                 }
-                sendEffect(UiEffect.ShowToast("Игра перезапущена. Ход игрока: ${if (firstPlayer == currentState.currentPlayerName) "Ваш" else "Соперника"}"))
+                sendEffect(UiEffect.ShowToast("Игра перезапущена. Ход игрока: ${if (samePlayer(firstPlayer, currentState.currentPlayerName)) "Ваш" else "Соперника"}"))
             } else if (restartResult is com.example.tictacfirebase.utils.Result.Error) {
                 val errorMessage = restartResult.message ?: restartResult.exception.message ?: "Неизвестная ошибка"
                 sendEffect(UiEffect.ShowToast("Ошибка перезапуска: $errorMessage"))
