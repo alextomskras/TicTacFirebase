@@ -7,6 +7,11 @@
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
         <item name="actionOverflowButtonStyle">@style/CustomOverflowButton</item>
+        <!-- На устройствах с edge-to-edge (Android 15+, принудительно для targetSdk 35,
+             а также на некоторых OEM-прошивках Samsung) контент без этой настройки
+             залезает под статус-бар и кнопки Accept/Request уезжают под верхнее меню. -->
+        <item name="android:fitsSystemWindows">true</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryDark</item>
     </style>
 
     <!-- Стиль для игрового поля -->
