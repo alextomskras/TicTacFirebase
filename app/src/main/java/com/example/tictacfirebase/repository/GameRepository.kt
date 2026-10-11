@@ -35,6 +35,56 @@ class GameRepository {
     }
 
     /**
+     * Полная очистка данных пользователя из Realtime Database при удалении аккаунта.
+     * Удаляет: профиль users/<логин>, presence-узел, легаси-токены Tokens/<token>
+     * (значения совпадают с ключами — удаляем те, что равны нашему токену) и все
+     * исходящие приглашения из чужих users/<other>/request, где значение == наш email.
+     * Игровые сессии PlayerOnline не трогаем: они принадлежат двум игрокам,
+     * соперник сам увидит выход (opponentLeft / отсутствие presence).
+     */
+    suspend fun deleteUserData(email: String, fcmToken: String?): Result<Unit> {
+        return runCatchingResult {
+            val username = email.substringBefore("@")
+
+            // 1. Профиль пользователя (включая его входящие приглашения users/<u>/request)
+            myRef.child("users").child(username).removeValue().await()
+
+            // 2. Presence («онлайн» в списке соседей)
+            myRef.child("presence").child(username).removeValue().await()
+
+            // 3. Легаси-узел Tokens: ключ == значение (токен), удаляем свои записи
+            if (!fcmToken.isNullOrEmpty()) {
+                val tokensSnap = myRef.child("Tokens").get().await()
+                tokensSnap.children.forEach { child ->
+                    if (child.value?.toString() == fcmToken) {
+                        child.ref.removeValue().await()
+                    }
+                }
+            }
+
+            // 4. Чистим исходящие приглашения у других пользователей:
+            //    в каждом users/<other>/request удаляем child со значением == наш email.
+            //    Правила БД запрещают читать весь узел users целиком ("$userId" не имеет
+            //    ".read"), поэтому читаем точечно только request-узлы соседей из presence.
+            val presenceSnap = myRef.child("presence").get().await()
+            val neighborNames = presenceSnap.children.mapNotNull { it.key }.toMutableSet()
+            neighborNames += username
+            for (neighbor in neighborNames) {
+                val requestsSnap = myRef.child("users").child(neighbor).child("request").get().await()
+                requestsSnap.children.forEach { req ->
+                    val value = req.value?.toString() ?: ""
+                    if (value.equals(email, ignoreCase = true) ||
+                        value.substringBefore("@") == username
+                    ) {
+                        req.ref.removeValue().await()
+                    }
+                }
+            }
+            Log.d("GameRepository", "User data purged for $email")
+        }
+    }
+
+    /**
      * Presence: отмечает пользователя «в сети» (узел presence/<username>).
      * onDisconnect сам удалит запись при закрытии приложения/обрыве соединения.
      */

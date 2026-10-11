@@ -31,6 +31,15 @@
     <string name="menu_new_game">Новая игра</string>
     <string name="menu_profile">Профиль</string>
     <string name="menu_neighbors">Соседи</string>
+    <string name="menu_delete_account">Удалить аккаунт</string>
+    <string name="delete_account_title">Удалить аккаунт?</string>
+    <string name="delete_account_message">Аккаунт и все его данные (профиль, приглашения, онлайн-статус) будут безвозвратно удалены. Игровые сессии останутся у соперников. Это действие нельзя отменить.</string>
+    <string name="delete_account_confirm">Удалить</string>
+    <string name="delete_account_cancel">Отмена</string>
+    <string name="delete_account_reauth_title">Подтвердите вход</string>
+    <string name="delete_account_reauth_message">Для удаления аккаунта Firebase требует подтвердить пароль. Введите пароль от %s:</string>
+    <string name="delete_account_done">Аккаунт удалён</string>
+    <string name="delete_account_error">Не удалось удалить аккаунт: %s</string>
 
     <!-- Экран «Соседи» -->
     <string name="neighbors_title">Соседи</string>

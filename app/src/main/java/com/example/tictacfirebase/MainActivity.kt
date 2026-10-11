@@ -613,6 +613,119 @@ open class MainActivity : AppCompatActivity() {
         startActivity(intent)
         finish()
     }
+
+    /**
+     * Удаление аккаунта (пункт меню «Удалить аккаунт»).
+     * Firebase требует недавний вход для delete(), поэтому сначала показываем
+     * диалог подтверждения, затем — ввод пароля и ре-аутентификацию через
+     * EmailAuthProvider.getCredential(текущий email, введённый пароль).
+     * Порядок: очистка данных в RTDB -> удаление Auth-аккаунта -> экран регистрации.
+     */
+    private fun confirmDeleteAccount() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.delete_account_title)
+            .setMessage(R.string.delete_account_message)
+            .setPositiveButton(R.string.delete_account_confirm) { _, _ ->
+                showDeleteAccountPasswordDialog()
+            }
+            .setNegativeButton(R.string.delete_account_cancel) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun showDeleteAccountPasswordDialog() {
+        val email = FirebaseAuth.getInstance().currentUser?.email ?: myEmail
+        if (email.isNullOrEmpty()) {
+            Toast.makeText(this, getString(R.string.delete_account_error, "нет активного пользователя"), Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            hint = "Пароль"
+        }
+        val container = android.widget.FrameLayout(this).apply {
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.delete_account_reauth_title)
+            .setMessage(getString(R.string.delete_account_reauth_message, email))
+            .setView(container)
+            .setPositiveButton(R.string.delete_account_confirm) { _, _ ->
+                val password = input.text.toString()
+                if (password.isBlank()) {
+                    Toast.makeText(this, "Введите пароль", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                performDeleteAccount(email, password)
+            }
+            .setNegativeButton(R.string.delete_account_cancel) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun performDeleteAccount(email: String, password: String) {
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            Toast.makeText(this, "Нет активного пользователя", Toast.LENGTH_SHORT).show()
+            return
+        }
+        showLoading(true)
+        lifecycleScope.launch {
+            try {
+                // 1. Ре-аутентификация паролем (требование Firebase для delete)
+                val credential = com.google.firebase.auth.EmailAuthProvider
+                    .getCredential(email, password)
+                user.reauthenticate(credential).await()
+
+                // 2. Получаем текущий FCM-токен, чтобы вычистить легаси-узел Tokens
+                val fcmToken = try {
+                    FirebaseMessaging.getInstance().token.await()
+                } catch (e: Exception) {
+                    null
+                }
+
+                // 3. Удаляем все данные пользователя из Realtime Database
+                GameRepository().deleteUserData(email, fcmToken)
+
+                // 4. Удаляем аккаунт Firebase Authentication
+                user.delete().await()
+
+                Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.delete_account_done),
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // 5. Переход на экран регистрации (аккаунт уже удалён, signOut не нужен)
+                val intent = Intent(this@MainActivity, registerActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+                finish()
+            } catch (e: Exception) {
+                Log.e(TAG, "Account deletion failed: ${e.message}")
+                val msg = when (e) {
+                    is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ->
+                        "Неверный пароль"
+                    else -> e.message ?: "неизвестная ошибка"
+                }
+                Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.delete_account_error, msg),
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                showLoading(false)
+            }
+        }
+    }
     
     /**
      * Запуск новой игры - сбрасывает состояние и пересоздает игровое поле
@@ -728,6 +841,10 @@ open class MainActivity : AppCompatActivity() {
             }
             R.id.action_logout -> {
                 buLogoutEvent(findViewById(android.R.id.content))
+                true
+            }
+            R.id.action_delete_account -> {
+                confirmDeleteAccount()
                 true
             }
             else -> super.onOptionsItemSelected(item)
