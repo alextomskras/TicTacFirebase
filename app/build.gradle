@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace 'com.example.tictacfirebase'
+    namespace 'com.dreamer.tictacfirebase'
     compileSdk 34
     
     buildFeatures {
@@ -14,7 +14,7 @@ android {
     }
     
     defaultConfig {
-        applicationId "com.example.tictacfirebase"
+        applicationId "com.dreamer.tictacfirebase"
         minSdk 23
         targetSdk 34
         versionCode 1

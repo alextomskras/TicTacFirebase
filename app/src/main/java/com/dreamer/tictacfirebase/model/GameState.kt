@@ -1,0 +1,58 @@
+package com.dreamer.tictacfirebase.model
+
+/**
+ * Представление состояния игры для UI.
+ * Immutable data class.
+ */
+data class GameState(
+    val isLoading: Boolean = false,
+    val isOnline: Boolean = true, // Статус подключения к интернету
+    val isMyTurn: Boolean = false,
+    val currentPlayerName: String = "",
+    val opponentName: String = "",
+    val playerAvatarUrl: String? = null,
+    val opponentAvatarUrl: String? = null,
+    val boardState: List<String> = List(9) { "" }, // "X", "O", ""
+    val gameStatus: GameStatus = GameStatus.WaitingForOpponent,
+    val errorMessage: String? = null,
+    val sessionId: String? = null,
+    val isFirstPlayer: Boolean = false // Является ли текущий игрок первым (X)
+)
+
+/**
+ * Статус игры (состояние матча)
+ */
+enum class GameStatus {
+    WaitingForOpponent, // Ожидание соперника
+    Playing,            // Игра идет
+    Won,                // Победа
+    Lost,               // Поражение
+    Draw,               // Ничья
+    OpponentLeft        // Соперник вышел
+}
+
+/**
+ * Результат действия пользователя (UI Event)
+ */
+sealed class UiEvent {
+    object CellClicked : UiEvent()
+    object CreateGameClicked : UiEvent()
+    object JoinGameClicked : UiEvent()
+    object RestartGameClicked : UiEvent()
+    data class JoinWithCode(val code: String) : UiEvent()
+    data class CellSelected(val cellIndex: Int) : UiEvent()
+    data class SendGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
+    data class AcceptGameRequest(val fromEmail: String, val toEmail: String) : UiEvent()
+    object StartNewGame : UiEvent() // Событие для запуска новой игры
+}
+
+/**
+ * Одноразовые UI эффекты (toast, навигация, диалоги)
+ */
+sealed class UiEffect {
+    data class ShowToast(val message: String) : UiEffect()
+    data class NavigateTo(val destination: String) : UiEffect()
+    object GameEnded : UiEffect()
+    object ShowLoading : UiEffect()
+    object HideLoading : UiEffect()
+}
