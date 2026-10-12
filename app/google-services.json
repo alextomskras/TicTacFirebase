@@ -10,7 +10,7 @@
       "client_info": {
         "mobilesdk_app_id": "YOUR_APP_ID",
         "android_client_info": {
-          "package_name": "com.example.tictacfirebase"
+          "package_name": "com.dreamer.tictacfirebase"
         }
       },
       "oauth_client": [],
